@@ -5,7 +5,8 @@ import { esc, icon, avatar, $, $$, toast, attachSearch, nameOf } from './ui.js';
 import { getMe, setMe, openSuggest } from './person.js';
 import { exportPng } from './chart.js';
 import { downloadGedcom } from './export.js';
-import { isEditing, enterEditor, exitEditor } from './editor.js';
+import { isEditing, enterEditor, exitEditor, hideEditor } from './editor.js';
+import { isSignedIn } from './backend.js';
 import { searchRow } from './views.js';
 
 // ---------- theme ----------
@@ -96,9 +97,10 @@ export function renderSettings(view, rerender) {
     <section class="card-box set-row">
       <h2>${icon('lock')} ${t('editorTitle')}</h2>
       <p class="small muted">${t('editorHelp')}</p>
-      <div class="row">${isEditing()
-        ? `<a class="btn" href="#/editor">${icon('edit')}${t('edTools')}</a><button class="btn" data-s="editor-off">${t('menuEditorOff')}</button>`
-        : `<button class="btn" data-s="editor">${icon('lock')}${t('menuEditor')}</button>`}</div>
+      ${isSignedIn()
+        ? `<label class="switch"><input type="checkbox" data-ed-toggle ${isEditing() ? 'checked' : ''}><span class="track"></span>${t('menuEditor')}</label>
+          <div class="row">${isEditing() ? `<a class="btn" href="#/editor">${icon('edit')}${t('edTools')}</a>` : ''}<button class="btn ghost" data-s="editor-off">${icon('lock')}${t('signOutEditor')}</button></div>`
+        : `<div class="row"><button class="btn" data-s="editor">${icon('lock')}${t('menuEditor')}</button></div>`}
     </section>
 
     <section class="card-box set-row">
@@ -115,6 +117,8 @@ export function renderSettings(view, rerender) {
   attachSearch(inp, inp.nextElementSibling, p => { setMe(p.id); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: searchRow });
   $$('input[name=lang]', view).forEach(r => r.onchange = () => { setLang(r.value); window.dispatchEvent(new Event('ft:lang')); });
   $$('input[name=theme]', view).forEach(r => r.onchange = () => { try { localStorage.setItem('ft.theme', r.value); } catch (e) {} applyTheme(); window.dispatchEvent(new Event('ft:theme')); });
+  const tg = $('[data-ed-toggle]', view);
+  if (tg) tg.onchange = () => tg.checked ? enterEditor(rerender) : hideEditor();
   view.onclick = async e => {
     const a = e.target.closest('[data-s]')?.dataset.s;
     if (a === 'clear-me') setMe(null);

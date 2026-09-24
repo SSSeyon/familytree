@@ -65,7 +65,7 @@ export function openPerson(pid) {
   ].filter(f => f[1]);
 
   const parentsHtml = pp ? [pp.father && relRow(pp.father, t('father')), pp.mother && relRow(pp.mother, t('mother'))].join('') : '';
-  const spousesHtml = unions.map(u => spouseIn(u, pid)).filter(Boolean).map(s => relRow(s, '')).join('');
+  const spousesHtml = unions.filter(u => spouseIn(u, pid)).map(u => relRow(spouseIn(u, pid), u.separated ? t('separated') : '')).join('');
   const kidsHtml = unions.map(u => {
     const kids = kidsOf(u.id);
     if (!kids.length) return '';

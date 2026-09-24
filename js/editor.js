@@ -58,6 +58,14 @@ export function exitEditor() {
   ED.on = false;
   updateBar(); changed();
 }
+// Hide the editor but stay signed in, so it can be switched back on from Settings.
+export function hideEditor() {
+  try { localStorage.removeItem('ft.editing'); } catch (e) {}
+  ED.on = false;
+  updateBar(); changed();
+  toast(t('editorHidden'), 3500);
+}
+
 export const wantsEditor = () => { try { return localStorage.getItem('ft.editing') === '1' && isSignedIn(); } catch (e) { return false; } };
 
 function commit() { ED.dirty++; saveDraft(); updateBar(); changed(); }
@@ -71,12 +79,12 @@ export function updateBar() {
     <button class="btn sm" data-e="new">${icon('plus')}${t('edNewPerson')}</button>
     <a class="btn sm" href="#/editor">${t('edTools')}</a>
     ${ED.dirty ? `<button class="btn sm" data-e="discard">${t('edDiscard')}</button><button class="btn sm primary" data-e="save">${icon('upload')}${t('edSaveGh')}</button>` : ''}
-    <button class="btn sm ghost" data-e="exit" aria-label="${t('menuEditorOff')}">${icon('close')}</button>`;
+    <button class="btn sm ghost" data-e="hide" aria-label="${t('hideEditor')}" title="${t('hideEditor')}">${icon('close')}</button>`;
   bar.onclick = async e => {
     const a = e.target.closest('[data-e]')?.dataset.e;
     if (a === 'save') saveAll();
     if (a === 'discard' && await confirmBox(t('edDiscard') + '?', t('edDiscard'))) { clearDraft(); ED.dirty = 0; ED.uploads.clear(); location.reload(); }
-    if (a === 'exit') exitEditor();
+    if (a === 'hide') hideEditor();
     if (a === 'new') { const id = createPerson({}); commit(); editPerson(id); }
   };
 }
@@ -292,7 +300,8 @@ export function editPerson(pid) {
     ${unions.length ? `<fieldset><legend>${t('married')}</legend>${unions.map(u => {
       const sp = spouseIn(u, pid);
       return `<div style="display:grid;gap:.4rem"><div class="row"><strong>${sp ? nameOf(person(sp)) : t('unknownPartner')}</strong><button type="button" class="btn sm ghost danger" data-unmarry="${esc(u.id)}">${t('removeSpouse')}</button></div>
-        ${dateInputs('m_' + u.id + '_', u.marriage)}<input type="text" name="mp_${esc(u.id)}" placeholder="${t('marriagePlace')}" value="${esc(u.place || '')}"></div>`;
+        ${dateInputs('m_' + u.id + '_', u.marriage)}<input type="text" name="mp_${esc(u.id)}" placeholder="${t('marriagePlace')}" value="${esc(u.place || '')}">
+        <label class="row small"><input type="checkbox" name="sep_${esc(u.id)}" ${u.separated ? 'checked' : ''}> ${t('separated')}</label></div>`;
     }).join('<hr style="border:0;border-top:1px solid var(--line)">')}</fieldset>` : ''}
     <fieldset><legend>${t('relatives')}</legend>
       <div class="row">
@@ -340,6 +349,7 @@ export function editPerson(pid) {
       const md = readDate(fd, 'm_' + u.id + '_');
       md ? (u.marriage = md) : delete u.marriage;
       const pl = s('mp_' + u.id); pl ? (u.place = pl) : delete u.place;
+      fd.get('sep_' + u.id) ? (u.separated = true) : delete u.separated;
     }
     for (const k of Object.keys(p)) if (p[k] === '' || (Array.isArray(p[k]) && !p[k].length)) delete p[k];
   };

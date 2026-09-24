@@ -42,7 +42,7 @@ export function renderFocus(view, pid) {
     </div></div><div class="fam-connector"></div>` : ''}
     <div class="center-block">
       ${pcard(pid, 'center', { href: `#/person/${esc(pid)}` })}
-      ${unions.map(u => spouseIn(u, pid)).filter(Boolean).map(s => `<span class="amp muted">⚭</span>${pcard(s)}`).join('')}
+      ${unions.filter(u => spouseIn(u, pid)).map(u => `<span class="amp muted" title="${u.separated ? esc(t('separated')) : ''}">${u.separated ? '⚮' : '⚭'}</span>${pcard(spouseIn(u, pid), u.separated ? 'sep' : '')}`).join('')}
     </div>
     <div class="focus-actions">
       <a class="btn sm" href="#/person/${esc(pid)}">${icon('info')}${t('details')}</a>
@@ -122,7 +122,8 @@ function pathDiagram(path, a, b) {
     const p = nodes[i - 1];
     if (n.edge === 'eSpouse') {
       const y = n.py + 34, x1 = Math.min(p.px, n.px) + 130, x2 = Math.max(p.px, n.px);
-      lines += `<path class="pl marr" d="M${x1},${y - 3}H${x2}M${x1},${y + 3}H${x2}"/>`;
+      const sep = unionsOf(p.id).some(u => spouseIn(u, p.id) === n.id && u.separated);
+      lines += `<path class="pl marr${sep ? ' sep' : ''}" d="M${x1},${y - 3}H${x2}M${x1},${y + 3}H${x2}"/>`;
       return;
     }
     const [top, bot] = n.edge === 'eParent' ? [n, p] : [p, n];

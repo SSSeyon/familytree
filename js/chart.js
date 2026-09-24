@@ -4,7 +4,8 @@ import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initi
 import { t } from './i18n.js';
 import { esc, icon, html, $, download, toast, srcAttr } from './ui.js';
 
-const W = 168, H = 64, SG = 12, HG = 22, VG = 70;
+const W = 146, H = 56, SG = 22, HG = 18, VG = 62;
+const CLIP = '<clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="28" cy="28" r="19"/></clipPath>';
 const PALETTE = ['--b1', '--b2', '--b3', '--b4', '--b5', '--b6', '--b7', '--b8'];
 const GENS = ['--g0', '--g1', '--g2', '--g3', '--g4', '--g5'];
 
@@ -14,12 +15,13 @@ const CHART_CSS = `
 .node:hover .card{stroke:var(--text-2)}
 .node.hl .card{stroke:var(--accent);stroke-width:3}
 .node.dup .card{stroke-dasharray:5 4;fill:var(--surface-2)}
-.nm{font:600 13px Inter,system-ui,sans-serif;fill:var(--text)}
-.sub{font:400 11px Inter,system-ui,sans-serif;fill:var(--text-2)}
-.ini{font:600 14px Inter,system-ui,sans-serif;fill:var(--text-3)}
+.nm{font:600 12.5px Inter,system-ui,sans-serif;fill:var(--text)}
+.sub{font:400 10.5px Inter,system-ui,sans-serif;fill:var(--text-2)}
+.ini{font:600 13px Inter,system-ui,sans-serif;fill:var(--text-3)}
 .phbg{fill:var(--surface-3)}
 .link{fill:none;stroke:var(--line-strong);stroke-width:1.5}
 .mline{stroke:var(--line-strong);stroke-width:2}
+.mline.sep{stroke-dasharray:4 3}
 .tog{cursor:pointer}
 .tog circle{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
 .tog text{font:600 11px Inter,system-ui,sans-serif;fill:var(--text-2)}
@@ -42,21 +44,35 @@ try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; } cat
 
 let ctx = null; // live render context
 
-export function renderChart(view, { root, focusId, onOpen, onRoot }) {
+// branch = a person tapped in the tree: show only their parents, siblings, spouses and
+// descendants. Without it, the whole line from root is drawn.
+export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBranch }) {
   const P = store.P;
-  root = root && P[root] ? root : chartState.root && P[chartState.root] ? chartState.root : mainFounder();
-  if (focusId && !descendants(root).has(focusId) && !spousesOf(focusId).some(s => descendants(root).has(s))) root = founderFor(focusId);
-  chartState.root = root;
-  const fresh = !chartState.collapsed.has(root);
-  if (fresh) chartState.collapsed.set(root, new Set());
-  const collapsed = chartState.collapsed.get(root);
-  if (fresh) defaultCollapse(root, collapsed);
-  if (focusId) expandTo(root, focusId, collapsed);
+  let mode = null, key;
+  if (branch && P[branch]) {
+    const pp = parentsOf(branch);
+    root = pp?.father || pp?.mother || branch;
+    mode = { focus: branch, root, pu: P[branch].parents };
+    key = 'f:' + branch;
+    focusId = branch;
+  } else {
+    root = root && P[root] ? root : chartState.root && P[chartState.root] ? chartState.root : mainFounder();
+    if (focusId && !descendants(root).has(focusId) && !spousesOf(focusId).some(s => descendants(root).has(s))) root = founderFor(focusId);
+    chartState.root = root;
+    key = root;
+  }
+  const fresh = !chartState.collapsed.has(key);
+  if (fresh) chartState.collapsed.set(key, new Set());
+  const collapsed = chartState.collapsed.get(key);
+  if (fresh) defaultCollapse(mode ? branch : root, collapsed);
+  if (focusId && !mode) expandTo(root, focusId, collapsed);
 
   view.innerHTML = '';
   const wrap = html(`<div class="chart-wrap">
     <div class="chart-toolbar">
-      ${root !== mainFounder() ? `<div class="tool-group"><button class="btn sm" data-act="home">${icon('tree')}${esc(t('lineOf', { name: displayName(P[mainFounder()]) }))}</button></div>` : ''}
+      ${mode
+        ? `<div class="tool-group"><button class="btn sm" data-act="whole">${icon('tree')}${t('wholeTree')}</button><button class="btn sm" data-act="details">${icon('info')}${t('details')}</button></div>`
+        : root !== mainFounder() ? `<div class="tool-group"><button class="btn sm" data-act="home">${icon('tree')}${esc(t('lineOf', { name: displayName(P[mainFounder()]) }))}</button></div>` : ''}
       <div class="tool-group"><label class="sr-only" for="colour-sel">${t('colourBy')}</label>
         <select id="colour-sel">${['branch', 'gen', 'sex', 'none'].map(c => `<option value="${c}" ${c === chartState.colourBy ? 'selected' : ''}>${t({ branch: 'cBranch', gen: 'cGen', sex: 'cSex', none: 'cNone' }[c])}</option>`).join('')}</select></div>
       <div class="tool-group">
@@ -66,7 +82,7 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
       </div>
     </div>
     <svg class="chart-svg" role="img" aria-label="${esc(t('tabChart'))}"><style>${CHART_CSS}</style>
-      <defs><clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="34" cy="32" r="22"/></clipPath></defs>
+      <defs>${CLIP}</defs>
       <g class="scene"></g></svg>
     <div class="legend" id="legend"></div>
     <div class="zoom-ctl tool-group">
@@ -81,15 +97,17 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
   const scene = svg.select('.scene');
   const zoom = d3.zoom().scaleExtent([0.02, 2.5]).on('zoom', e => {
     scene.attr('transform', e.transform);
-    chartState.transforms.set(root, e.transform);
+    chartState.transforms.set(key, e.transform);
   });
   svg.call(zoom).on('dblclick.zoom', null);
 
-  ctx = { wrap, svg, scene, zoom, root, collapsed, onOpen, onRoot, layout: null };
+  ctx = { wrap, svg, scene, zoom, root, mode, collapsed, onOpen, onRoot, onBranch, layout: null, highlight: mode ? branch : undefined };
   draw();
 
-  const saved = chartState.transforms.get(root);
-  if (focusId) centerOn(focusId, false);
+  const saved = chartState.transforms.get(key);
+  if (mode && saved) svg.call(zoom.transform, saved);
+  else if (mode) fitOrCenter(branch);
+  else if (focusId) centerOn(focusId, false);
   else if (saved) svg.call(zoom.transform, saved);
   else initialView();
 
@@ -102,9 +120,11 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
     if (act === 'out') svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.4);
     if (act === 'fit') fit();
     if (act === 'expand') { collapsed.clear(); draw(); fit(); }
-    if (act === 'collapse') { collapsed.clear(); defaultCollapse(ctx.root, collapsed, 2); draw(); initialView(); }
+    if (act === 'collapse') { collapsed.clear(); defaultCollapse(mode ? branch : ctx.root, collapsed, 2); draw(); initialView(); }
     if (act === 'png') exportPng();
     if (act === 'home') onRoot(mainFounder());
+    if (act === 'whole') location.hash = `#/chart/${branch}`;
+    if (act === 'details') onOpen(branch);
   });
 }
 
@@ -115,11 +135,16 @@ const dims = () => ({ B: W, SGB: SG, GAP: HG, STEP: H + VG });
 function build(pid, depth, seen, collapsed) {
   const dup = seen.has(pid);
   seen.add(pid);
-  const unions = dup ? [] : unionsOf(pid);
+  let unions = dup ? [] : unionsOf(pid);
+  const m = ctx.mode;
+  if (m && m.root !== m.focus) {
+    if (depth === 0) unions = unions.filter(u => u.id === m.pu);     // the parent: only the couple they share
+    else if (depth === 1 && pid !== m.focus) unions = [];          // siblings: just the person
+  }
   const node = { pid, depth, dup, spouses: [], groups: [], hasKids: false, collapsed: collapsed.has(pid) };
   for (const u of unions) {
     const sp = spouseIn(u, pid);
-    const si = sp ? node.spouses.push({ pid: sp, uid: u.id }) - 1 : -1;
+    const si = sp ? node.spouses.push({ pid: sp, uid: u.id, sep: !!u.separated }) - 1 : -1;
     const kids = kidsOf(u.id);
     if (kids.length) node.hasKids = true;
     if (kids.length && !node.collapsed) node.groups.push({ uid: u.id, si, kids: kids.map(k => build(k, depth + 1, seen, collapsed)) });
@@ -223,7 +248,7 @@ function draw() {
   const { scene, root } = ctx;
   const { nodes } = flatten(root);
   ctx.layout = nodes;
-  const bi = branchInfo(root);
+  const bi = branchInfo(ctx.mode ? mainFounder() : root);
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0);
   drawLegend(maxDepth);
   const hl = ctx.highlight;
@@ -233,7 +258,7 @@ function draw() {
   for (const n of nodes) {
     // marriage lines
     n.spouses.forEach(s => {
-      links += `<line class="mline" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
+      links += `<line class="mline${s.sep ? ' sep' : ''}" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
     });
     // child connectors
     for (const g of n.groups) {
@@ -244,7 +269,7 @@ function draw() {
       links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${busY + VG / 2}`).join('')}"/>`;
     }
     cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids ? (n.collapsed ? '+' + n.kidCount : '−') : null });
-    n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: hasParents(s.pid) && !descendants(root).has(s.pid) }); });
+    n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: !ctx.mode && hasParents(s.pid) && !descendants(root).has(s.pid) }); });
   }
   scene.html(`<g class="links">${links}</g><g class="cards">${cards}</g>`);
 
@@ -259,27 +284,28 @@ function draw() {
       return;
     }
     if (e.target.closest('.badge')) { ctx.onRoot(founderFor(parentsOf(pid)?.father || parentsOf(pid)?.mother || pid), pid); return; }
-    ctx.onOpen(pid);
+    // tap someone: show their own family; tap the person already in focus: open their card
+    if (ctx.mode?.focus === pid || !ctx.onBranch) ctx.onOpen(pid); else ctx.onBranch(pid);
   });
 }
 
 function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
   const p = person(pid) || {};
   const name = displayName(p);
-  const nm = name.length > 17 ? name.slice(0, 16) + '…' : name;
+  const nm = name.length > 14 ? name.slice(0, 13) + '…' : name;
   const sub = [p.nickname ? `“${p.nickname}”` : '', lifeSpan(p)].filter(Boolean).join(' · ');
-  const subT = sub.length > 24 ? sub.slice(0, 23) + '…' : sub;
+  const subT = sub.length > 17 ? sub.slice(0, 16) + '…' : sub;
   const col = colourFor(pid, depth, spouse, bi);
   const photo = p.photo
-    ? `<circle class="phbg" cx="34" cy="32" r="22"/><image ${srcAttr(p.photo, 'href')} x="12" y="10" width="44" height="44" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
-    : `<circle class="phbg" cx="34" cy="32" r="22"/><text class="ini" x="34" y="37" text-anchor="middle">${esc(initials(p))}</text>`;
+    ? `<circle class="phbg" cx="28" cy="28" r="19"/><image ${srcAttr(p.photo, 'href')} x="9" y="9" width="38" height="38" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
+    : `<circle class="phbg" cx="28" cy="28" r="19"/><text class="ini" x="28" y="32.5" text-anchor="middle">${esc(initials(p))}</text>`;
   return `<g class="node${dup ? ' dup' : ''}${hl === pid ? ' hl' : ''}" data-pid="${esc(pid)}" transform="translate(${x},${y})">
     <title>${esc(name)}${p.nickname ? ` (${esc(p.nickname)})` : ''}</title>
     <rect class="card" width="${W}" height="${H}" rx="12"/>
-    <rect x="3" y="9" width="5" height="${H - 18}" rx="2.5" fill="${col}"/>
+    <rect x="3" y="8" width="4" height="${H - 16}" rx="2.5" fill="${col}"/>
     ${photo}
-    <text class="nm" x="64" y="${sub ? 28 : 37}">${esc(nm)}</text>
-    ${sub ? `<text class="sub" x="64" y="45">${esc(subT)}</text>` : ''}
+    <text class="nm" x="54" y="${sub ? 25 : 32}">${esc(nm)}</text>
+    ${sub ? `<text class="sub" x="54" y="40">${esc(subT)}</text>` : ''}
     ${toggle ? `<g class="tog" transform="translate(${W / 2},${H})"><circle r="${toggle.length > 1 ? 13 : 10}"/><text y="4" text-anchor="middle">${toggle}</text></g>` : ''}
     ${badge ? `<g class="badge" transform="translate(${W - 34},-9)"><title>${esc(t('showFamily'))}</title><rect width="28" height="18" rx="9"/><text x="14" y="13" text-anchor="middle">↑</text></g>` : ''}
   </g>`;
@@ -318,6 +344,17 @@ export function fit() {
   const { w, h } = viewport();
   const k = Math.max(0.02, Math.min(1.2, (w - 40) / (maxX + 20), (h - 120) / (maxY + 20)));
   ctx.svg.transition().duration(400).call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 70).scale(k));
+}
+
+// Show the whole (small) family if it fits at a readable size, else centre on the person.
+function fitOrCenter(pid) {
+  const { maxX, maxY } = extents();
+  const { w, h } = viewport();
+  const k = Math.min(1, (w - 40) / (maxX + 20), (h - 140) / (maxY + 20));
+  if (k < 0.6) return centerOn(pid, false);
+  ctx.highlight = pid;
+  ctx.scene.selectAll('.node').classed('hl', function () { return this.dataset.pid === pid; });
+  ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 80).scale(k));
 }
 
 export function centerOn(pid, animate = true) {
@@ -381,7 +418,7 @@ export async function exportPng() {
   }));
   const title = `${store.tree.meta?.title || ''} — ${t('lineOf', { name: displayName(person(ctx.root)) })}`;
   const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}" style="${vars}">
-    <style>${CHART_CSS}</style><defs><clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="34" cy="32" r="22"/></clipPath></defs>
+    <style>${CHART_CSS}</style><defs>${CLIP}</defs>
     <rect width="100%" height="100%" fill="${cs.getPropertyValue('--bg').trim()}"/>
     <text x="${pad}" y="${pad + 8}" style="font:650 22px Fraunces,Georgia,serif;fill:${cs.getPropertyValue('--text').trim()}">${esc(title)}</text>
     ${new XMLSerializer().serializeToString(clone)}</svg>`;

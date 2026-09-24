@@ -78,6 +78,8 @@ const STR = {
     hardRefresh: 'Hard refresh', hardRefreshHelp: 'Reloads the app and the family data fresh from the internet. Use it if something looks out of date.',
     dataUpdated: 'Family data updated {date}', signedOut: 'Your editing session ended — enter the passphrase again, then save.',
     tooMany: 'Too many wrong tries. Wait a few minutes and try again.', suggestions: 'Suggestions received', noSuggestions: 'No suggestions yet.', sgDone: 'Done',
+    wholeTree: 'Whole tree', separated: 'No longer together', hideEditor: 'Hide editor (stay signed in)',
+    editorHidden: 'Editor mode off. Switch it back on any time in Settings → Editing.', signOutEditor: 'Sign out of editing',
   },
   yo: {
     tabChart: 'Igi ìdílé', tabFocus: 'Ìdílé', tabRelate: 'Ìbátan', tabTimeline: 'Ìtàn ọdún', tabGallery: 'Àwòrán', tabStats: 'Àkópọ̀',
@@ -126,6 +128,7 @@ const STR = {
     wrongPass: 'Ọ̀rọ̀ aṣínà kò tọ̀nà.', play: 'Gbọ́', edSaveGh: 'Fipamọ́', offline: 'O kò sí lórí íńtánẹ́ẹ̀tì — ẹ̀dà tó kẹ́yìn nìyí.', updated: 'A ti mú igi náà dójú ìwọ̀n.',
     relOf: '{rel} {a}', relStart: 'Ẹni àkọ́kọ́', commonAncestor: 'Baba ńlá kan náà',
     hardRefresh: 'Tún un gbé kalẹ̀ pátápátá', dataUpdated: 'A ṣe àtúnṣe ìwífún ìdílé ní {date}', sgDone: 'Ó ti parí',
+    wholeTree: 'Gbogbo igi', separated: 'Wọn kò sí papọ̀ mọ́',
   },
   // Gungbe written with Yoruba letters. DRAFT — please correct. Missing keys fall back to English.
   gun: {

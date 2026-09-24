@@ -22,7 +22,7 @@ function blood(a, b) {
 export function relation(a, b) {
   if (!a || !b) return null;
   if (a === b) return { k: 'self' };
-  if (spousesOf(a).includes(b)) return { k: 'spouse' };
+  if (spousesOf(a).includes(b)) return { k: 'spouse', former: unionsOf(a).filter(u => spouseIn(u, a) === b).every(u => u.separated) };
   const r = blood(a, b);
   if (r) return { k: 'blood', ...r };
   // step / in-law via A's spouse (link = that spouse, used to draw the path)
@@ -127,7 +127,7 @@ function enBlood(r, sex) {
 function enRel(rel, sexB, spouseName) {
   switch (rel.k) {
     case 'self': return null;
-    case 'spouse': return g(sexB, 'husband', 'wife', 'spouse');
+    case 'spouse': return (rel.former ? 'former ' : '') + g(sexB, 'husband', 'wife', 'spouse');
     case 'blood': return enBlood(rel, sexB);
     case 'stepchild': return g(sexB, 'stepson', 'stepdaughter', 'stepchild');
     case 'stepparent': return g(sexB, 'stepfather', 'stepmother', 'step-parent');
@@ -143,7 +143,7 @@ function enRel(rel, sexB, spouseName) {
 
 // Yoruba: kinship is mostly by age (ẹ̀gbọ́n/àbúrò) and generation, not gender.
 function yoRel(rel, sexB, a, b) {
-  if (rel.k === 'spouse') return g(sexB, 'ọkọ', 'ìyàwó', 'ẹnìkejì');
+  if (rel.k === 'spouse') return g(sexB, 'ọkọ', 'ìyàwó', 'ẹnìkejì') + (rel.former ? ' àtijọ́' : '');
   if (rel.k === 'blood') {
     const { up, down } = rel;
     if (up === 0) return down === 1 ? g(sexB, 'ọmọkùnrin', 'ọmọbìnrin', 'ọmọ') : down === 2 ? 'ọmọ-ọmọ' : `ọmọ-ọmọ (ìran ${down})`;

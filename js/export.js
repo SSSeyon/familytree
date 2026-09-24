@@ -40,6 +40,7 @@ export function toGedcom() {
     if (u.wife && iid.has(u.wife)) L.push(`1 WIFE ${iid.get(u.wife)}`);
     kidsOf(u.id).forEach(k => L.push(`1 CHIL ${iid.get(k)}`));
     if (u.marriage || u.place) { L.push('1 MARR'); if (u.marriage) L.push(`2 DATE ${gdate(u.marriage)}`); text(L, 2, 'PLAC', u.place); }
+    if (u.separated) L.push('1 DIV Y');
   }
   L.push('0 TRLR');
   return L.join('\r\n');

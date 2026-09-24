@@ -18,7 +18,7 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 | Path | What it is |
 |---|---|
 | `index.html`, `css/`, `js/` | The app |
-| `version.js` | App version shown in Settings (`V1.3`). **Bump it on every update**; this also refreshes everyone's offline copy. |
+| `version.js` | App version shown in Settings (`V1.4`). **Bump it on every update**; this also refreshes everyone's offline copy. |
 | `config.js` | Settings: Firebase details, WhatsApp number, start person, privacy |
 | `backend/firestore.rules` | Security rules to paste into Firebase |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable app (PWA) and offline support |

@@ -34,8 +34,14 @@ function route() {
       openPerson(pid);
       return; // keep the view underneath
     }
-    case 'line': show('chart'); renderChart(view, { root: r.args[0], focusId: r.args[1], onOpen: openPerson, onRoot }); break;
-    case 'chart': show('chart'); renderChart(view, { focusId: r.args[0] || (!prev ? lastPersonIfSet() : undefined), onOpen: openPerson, onRoot }); break;
+    case 'line': show('chart'); renderChart(view, { root: r.args[0], focusId: r.args[1], onOpen: openPerson, onRoot, onBranch }); break;
+    case 'chart': show('chart'); renderChart(view, { focusId: r.args[0] || (!prev ? lastPersonIfSet() : undefined), onOpen: openPerson, onRoot, onBranch }); break;
+    case 'branch': {
+      if (!person(r.args[0])) { location.hash = '#/chart'; return; }
+      show('chart'); rememberPerson(r.args[0]);
+      renderChart(view, { branch: r.args[0], onOpen: openPerson, onRoot, onBranch });
+      break;
+    }
     case 'focus': show('focus'); renderFocus(view, r.args[0] && person(r.args[0]) ? r.args[0] : lastPerson()); break;
     case 'relate': show('relate'); renderRelate(view, r.args[0], r.args[1]); break;
     case 'explore': show('explore'); renderExplore(view, r.args[0]); break;
@@ -50,6 +56,7 @@ function route() {
   view.scrollTop = 0;
 }
 function onRoot(rootId, focusId) { location.hash = focusId ? `#/line/${rootId}/${focusId}` : `#/line/${rootId}`; }
+function onBranch(pid) { location.hash = `#/branch/${pid}`; }
 // On the very first chart of a returning visit, centre on the person they last looked at.
 function lastPersonIfSet() { try { return localStorage.getItem('ft.last') || undefined; } catch (e) { return undefined; } }
 
@@ -98,8 +105,8 @@ function wire() {
   attachSearch($('#search'), $('#search-results'), p => {
     rememberPerson(p.id);
     if (current.name === 'chart') {
-      const same = location.hash === `#/chart/${p.id}`;
-      location.hash = `#/chart/${p.id}`;
+      const same = location.hash === `#/branch/${p.id}`;
+      location.hash = `#/branch/${p.id}`;
       if (same) route();
     } else location.hash = `#/focus/${p.id}`;
   }, { searchFn: q => search(q), render: searchRow });
