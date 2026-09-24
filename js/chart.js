@@ -4,8 +4,8 @@ import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initi
 import { t } from './i18n.js';
 import { esc, icon, html, $, download, toast, srcAttr } from './ui.js';
 
-const W = 146, H = 56, SG = 22, HG = 18, VG = 62;
-const CLIP = '<clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="28" cy="28" r="19"/></clipPath>';
+const W = 146, H = 60, SG = 22, HG = 18, VG = 62;
+const CLIP = '<clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="28" cy="30" r="19"/></clipPath>';
 const PALETTE = ['--b1', '--b2', '--b3', '--b4', '--b5', '--b6', '--b7', '--b8'];
 const GENS = ['--g0', '--g1', '--g2', '--g3', '--g4', '--g5'];
 
@@ -44,15 +44,16 @@ try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; } cat
 
 let ctx = null; // live render context
 
-// branch = a person tapped in the tree: show only their parents, siblings, spouses and
-// descendants. Without it, the whole line from root is drawn.
+// branch = a person tapped in the tree: show their forebears up to the top of the line,
+// their siblings (full and half), spouses and descendants. Without it, the whole line from root is drawn.
 export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBranch }) {
   const P = store.P;
   let mode = null, key;
   if (branch && P[branch]) {
-    const pp = parentsOf(branch);
-    root = pp?.father || pp?.mother || branch;
-    mode = { focus: branch, root, pu: P[branch].parents };
+    const chain = lineage(branch);
+    root = chain[0];
+    const next = new Map(chain.slice(0, -1).map((a, i) => [a, chain[i + 1]]));
+    mode = { focus: branch, root, pu: P[branch].parents, next, parent: chain[chain.length - 2], depth: chain.length - 1 };
     key = 'f:' + branch;
     focusId = branch;
   } else {
@@ -132,24 +133,49 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
 // "b" = breadth axis (x), depth = y.
 const dims = () => ({ B: W, SGB: SG, GAP: HG, STEP: H + VG });
 
+// Forebears of pid, top first, following the parent who belongs to the main family line.
+function lineage(pid) {
+  const main = descendants(mainFounder());
+  const chain = [pid];
+  for (let cur = pid, g = 0; g < 80; g++) {
+    const pp = parentsOf(cur);
+    const cands = [pp?.father, pp?.mother].filter(Boolean);
+    const up = cands.find(x => main.has(x)) || cands.find(x => person(x)?.parents) || cands[0];
+    if (!up || chain.includes(up)) break;
+    chain.unshift(up); cur = up;
+  }
+  return chain;
+}
+
 function build(pid, depth, seen, collapsed) {
   const dup = seen.has(pid);
   seen.add(pid);
   let unions = dup ? [] : unionsOf(pid);
   const m = ctx.mode;
-  if (m && m.root !== m.focus) {
-    if (depth === 0) unions = unions.filter(u => u.id === m.pu);     // the parent: only the couple they share
-    else if (depth === 1 && pid !== m.focus) unions = [];          // siblings: just the person
+  let only = null, lock = false;
+  if (m) {
+    const nx = m.next.get(pid);
+    lock = !!nx;
+    if (nx && pid !== m.parent) { unions = unions.filter(u => kidsOf(u.id).includes(nx)); only = nx; } // forebears: just the line
+    else if (depth === m.depth && pid !== m.focus) unions = [];                                        // siblings: just the person
   }
-  const node = { pid, depth, dup, spouses: [], groups: [], hasKids: false, collapsed: collapsed.has(pid) };
+  const node = { pid, depth, dup, lock, spouses: [], groups: [], hasKids: false, collapsed: !lock && collapsed.has(pid) };
   for (const u of unions) {
     const sp = spouseIn(u, pid);
     const si = sp ? node.spouses.push({ pid: sp, uid: u.id, sep: !!u.separated }) - 1 : -1;
-    const kids = kidsOf(u.id);
+    const kids = only ? [only] : kidsOf(u.id);
     if (kids.length) node.hasKids = true;
     if (kids.length && !node.collapsed) node.groups.push({ uid: u.id, si, kids: kids.map(k => build(k, depth + 1, seen, collapsed)) });
   }
-  node.kidCount = unions.reduce((n, u) => n + kidsOf(u.id).length, 0);
+  // the focus's other parent may have children with someone else: they are siblings too
+  if (m && pid === m.parent && m.pu) {
+    const u0 = store.U[m.pu], op = u0 && spouseIn(u0, pid), si = node.spouses.findIndex(s => s.pid === op);
+    if (si >= 0) for (const u of unionsOf(op)) {
+      const kids = u.id === m.pu ? [] : kidsOf(u.id).filter(k => !seen.has(k));
+      if (kids.length) node.groups.push({ uid: u.id, si, viaSp: true, kids: kids.map(k => build(k, depth + 1, seen, collapsed)) });
+    }
+  }
+  node.kidCount = only ? 1 : unions.reduce((n, u) => n + kidsOf(u.id).length, 0);
   const { B, SGB } = dims();
   node.blockB = B + node.spouses.length * (B + SGB);
   layoutKids(node);
@@ -261,14 +287,15 @@ function draw() {
       links += `<line class="mline${s.sep ? ' sep' : ''}" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
     });
     // child connectors
-    for (const g of n.groups) {
-      const ox = g.si < 0 ? n.px + W / 2 : g.si === 0 ? n.px + W + SG / 2 : n.spouses[g.si].x + W / 2;
-      const oy = g.si === 0 ? n.py + H / 2 : n.py + H;
-      const busY = n.py + H + VG / 2;
+    n.groups.forEach((g, gi) => {
+      const fromSp = g.si > 0 || g.viaSp;
+      const ox = g.si < 0 ? n.px + W / 2 : fromSp ? n.spouses[g.si].x + W / 2 : n.px + W + SG / 2;
+      const oy = g.si === 0 && !fromSp ? n.py + H / 2 : n.py + H;
+      const busY = n.py + H + VG / 2 - Math.min(gi, 3) * 6; // stagger so separate families don't merge
       const xs = g.kids.map(k => k.px + W / 2);
-      links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${busY + VG / 2}`).join('')}"/>`;
-    }
-    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids ? (n.collapsed ? '+' + n.kidCount : '−') : null });
+      links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${n.py + H + VG}`).join('')}"/>`;
+    });
+    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids && !n.lock ? (n.collapsed ? '+' + n.kidCount : '−') : null });
     n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: !ctx.mode && hasParents(s.pid) && !descendants(root).has(s.pid) }); });
   }
   scene.html(`<g class="links">${links}</g><g class="cards">${cards}</g>`);
@@ -292,20 +319,22 @@ function draw() {
 function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
   const p = person(pid) || {};
   const name = displayName(p);
-  const nm = name.length > 14 ? name.slice(0, 13) + '…' : name;
-  const sub = [p.nickname ? `“${p.nickname}”` : '', lifeSpan(p)].filter(Boolean).join(' · ');
-  const subT = sub.length > 17 ? sub.slice(0, 16) + '…' : sub;
+  const cut = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+  // first name on one row, surname on the row below
+  const rows = (p.given && p.surname ? [p.given, p.surname] : [name]).map(r => cut(r, 14));
+  const sub = cut([p.nickname ? `“${p.nickname}”` : '', lifeSpan(p)].filter(Boolean).join(' · '), 17);
+  const ys = rows.length === 2 ? (sub ? [20, 34, 48] : [27, 41]) : (sub ? [27, 42] : [34]);
   const col = colourFor(pid, depth, spouse, bi);
   const photo = p.photo
-    ? `<circle class="phbg" cx="28" cy="28" r="19"/><image ${srcAttr(p.photo, 'href')} x="9" y="9" width="38" height="38" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
-    : `<circle class="phbg" cx="28" cy="28" r="19"/><text class="ini" x="28" y="32.5" text-anchor="middle">${esc(initials(p))}</text>`;
+    ? `<circle class="phbg" cx="28" cy="30" r="19"/><image ${srcAttr(p.photo, 'href')} x="9" y="11" width="38" height="38" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
+    : `<circle class="phbg" cx="28" cy="30" r="19"/><text class="ini" x="28" y="34.5" text-anchor="middle">${esc(initials(p))}</text>`;
   return `<g class="node${dup ? ' dup' : ''}${hl === pid ? ' hl' : ''}" data-pid="${esc(pid)}" transform="translate(${x},${y})">
     <title>${esc(name)}${p.nickname ? ` (${esc(p.nickname)})` : ''}</title>
     <rect class="card" width="${W}" height="${H}" rx="12"/>
     <rect x="3" y="8" width="4" height="${H - 16}" rx="2.5" fill="${col}"/>
     ${photo}
-    <text class="nm" x="54" y="${sub ? 25 : 32}">${esc(nm)}</text>
-    ${sub ? `<text class="sub" x="54" y="40">${esc(subT)}</text>` : ''}
+    ${rows.map((r, i) => `<text class="nm" x="54" y="${ys[i]}">${esc(r)}</text>`).join('')}
+    ${sub ? `<text class="sub" x="54" y="${ys[rows.length]}">${esc(sub)}</text>` : ''}
     ${toggle ? `<g class="tog" transform="translate(${W / 2},${H})"><circle r="${toggle.length > 1 ? 13 : 10}"/><text y="4" text-anchor="middle">${toggle}</text></g>` : ''}
     ${badge ? `<g class="badge" transform="translate(${W - 34},-9)"><title>${esc(t('showFamily'))}</title><rect width="28" height="18" rx="9"/><text x="14" y="13" text-anchor="middle">↑</text></g>` : ''}
   </g>`;
@@ -350,11 +379,15 @@ export function fit() {
 function fitOrCenter(pid) {
   const { maxX, maxY } = extents();
   const { w, h } = viewport();
-  const k = Math.min(1, (w - 40) / (maxX + 20), (h - 140) / (maxY + 20));
-  if (k < 0.6) return centerOn(pid, false);
+  let k = Math.min(1, (w - 40) / (maxX + 20), (h - 140) / (maxY + 20));
   ctx.highlight = pid;
   ctx.scene.selectAll('.node').classed('hl', function () { return this.dataset.pid === pid; });
-  ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 80).scale(k));
+  if (k >= 0.45) return ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 80).scale(k));
+  // too big to read at once: frame the person and the top of their line
+  const pos = nodePos(pid), xs = [pid, ...(ctx.mode?.next.keys() || [])].map(nodePos).filter(Boolean).map(p => p.x);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) + W;
+  k = Math.max(0.35, Math.min(0.8, (w - 32) / (x1 - x0), (h - 190) / (pos.y + H)));
+  ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate(w / 2 - (x0 + x1) / 2 * k, 80).scale(k));
 }
 
 export function centerOn(pid, animate = true) {

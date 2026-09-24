@@ -5,6 +5,7 @@ import { branchColour } from './chart.js';
 import { getMe, openSuggest, datesLine, rememberPerson } from './person.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, attachSearch, nameOf, srcAttr } from './ui.js';
+import { renderMonth } from './month.js';
 
 const searchRow = p => `${avatar(p, 'sm')}<span><div>${nameOf(p)}${p.nickname ? ` <span class="muted small">“${esc(p.nickname)}”</span>` : ''}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>`;
 
@@ -33,7 +34,7 @@ export function renderFocus(view, pid) {
   const gp = side => { const q = side && parentsOf(side); return q ? [q.father, q.mother].filter(Boolean) : []; };
   const grand = pp ? [...gp(pp.father), ...gp(pp.mother)] : [];
   const unions = unionsOf(pid);
-  const sib = siblingsOf(pid);
+  const sib = siblingsOf(pid), sibs = [...sib.full, ...sib.half];
 
   view.innerHTML = `<div class="focus">
     ${grand.length ? `<div class="fam-label">${t('grandparents')}</div><div class="fam-row">${grand.map(g => pcard(g, 'sm')).join('')}</div><div class="fam-connector"></div>` : ''}
@@ -55,8 +56,7 @@ export function renderFocus(view, pid) {
       return `<div class="kid-group">${unions.length > 1 || !sp ? `<h4>${esc(sp ? t('withSpouse', { name: displayName(person(sp)) }) : t('withUnknown'))}</h4>` : ''}
         <div class="fam-row">${kidsOf(u.id).map(k => pcard(k, 'sm')).join('')}</div></div>`;
     }).join('')}
-    ${sib.full.length ? `<div class="fam-label">${t('siblings')}</div><div class="fam-row">${sib.full.map(s => pcard(s, 'sm')).join('')}</div>` : ''}
-    ${sib.half.length ? `<div class="fam-label">${t('halfSiblings')}</div><div class="fam-row">${sib.half.map(s => pcard(s, 'sm')).join('')}</div>` : ''}
+    ${sibs.length ? `<div class="fam-label">${t('siblings')}</div><div class="fam-row">${sibs.map(s => pcard(s, 'sm')).join('')}</div>` : ''}
   </div>`;
   $('[data-suggest]', view).onclick = () => openSuggest(pid);
 }
@@ -192,13 +192,6 @@ export function renderGallery(view, { isEditing, onAddPhoto } = {}) {
 }
 
 // ---------- Stats ----------
-function daysUntil(m, d) {
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  let next = new Date(now.getFullYear(), m - 1, d);
-  if (next < now) next = new Date(now.getFullYear() + 1, m - 1, d);
-  return Math.round((next - now) / 864e5);
-}
-const whenLabel = n => n === 0 ? t('today') : n === 1 ? t('tomorrow') : t('inDays', { n });
 
 export function maxGenerations(root) {
   const memo = new Map();
@@ -215,10 +208,6 @@ export function renderStats(view) {
   const people = allPeople();
   const named = people.filter(isNamed);
   const photos = people.filter(p => p.photo).length;
-  const today = new Date();
-  const bdays = people.filter(p => isLiving(p) && p.birth?.m && p.birth?.d).map(p => ({ p, n: daysUntil(p.birth.m, p.birth.d) })).filter(x => x.n <= 60).sort((a, b) => a.n - b.n);
-  const remember = people.filter(p => p.death?.m && p.death?.d).map(p => ({ p, n: daysUntil(p.death.m, p.death.d) })).sort((a, b) => a.n - b.n);
-  const onDay = people.filter(p => (p.birth?.m === today.getMonth() + 1 && p.birth?.d === today.getDate()) || (p.death?.m === today.getMonth() + 1 && p.death?.d === today.getDate()));
   const unnamed = people.filter(p => !isNamed(p));
   const noDates = named.filter(p => !p.birth && !p.death).length;
   const gens = maxGenerations(mainFounder());
@@ -227,11 +216,6 @@ export function renderStats(view) {
 
   view.innerHTML = `<div class="page"><div class="page-head"><h1>${t('statsTitle')}</h1></div>
     <div class="tiles">${tile(people.length, t('sPeople'))}${tile(named.length, t('sNamed'))}${tile(Object.keys(store.U).length, t('sFamilies'))}${tile(gens, t('sGens'))}${tile(photos, t('sPhotos'))}${tile(founders().length, t('sLines'))}</div>
-    <section class="card-box"><h2>${t('upcoming')}</h2>
-      ${onDay.length ? `<p><strong>${t('onThisDay')}:</strong> ${onDay.map(p => `<a href="#/person/${esc(p.id)}">${nameOf(p)}</a>`).join(', ')}</p>` : ''}
-      ${bdays.length ? `<ul class="list-plain">${bdays.map(({ p, n }) => row(p, `${esc(fmtDate({ m: p.birth.m, d: p.birth.d }))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : `<p class="muted">${t('noneSoon')}</p>`}
-      ${remember.length ? `<h3 style="margin-top:1.2rem">${t('remembrance')}</h3><ul class="list-plain">${remember.slice(0, 6).map(({ p, n }) => row(p, `${esc(fmtDate(p.death))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : ''}
-    </section>
     <section class="card-box" style="margin-top:1rem"><h2>${t('helpTitle')}</h2><p class="muted">${t('helpIntro')}</p>
       <p class="small">${named.length - named.filter(p => p.photo).length} ${t('noPhoto')} · ${noDates} ${t('noDates')}</p>
       ${unnamed.length ? `<h3>${t('unnamed')} (${unnamed.length})</h3><ul class="list-plain">${unnamed.map(p => `<li>${avatar(p, 'sm')}<a href="#/person/${esc(p.id)}">${esc(contextLine(p.id) || t('unknown'))}</a><span class="right"><button class="btn sm" data-sg="${esc(p.id)}">${t('suggest')}</button></span></li>`).join('')}</ul>` : ''}
@@ -243,11 +227,12 @@ export { searchRow };
 
 // ---------- Explore: photos / timeline / stats in one tab ----------
 export function renderExplore(view, sub) {
-  sub = ['photos', 'timeline', 'stats'].includes(sub) ? sub : (() => { try { return localStorage.getItem('ft.explore') || 'photos'; } catch (e) { return 'photos'; } })();
+  sub = ['month', 'photos', 'timeline', 'stats'].includes(sub) ? sub : (() => { try { return localStorage.getItem('ft.explore') || 'month'; } catch (e) { return 'month'; } })();
   try { localStorage.setItem('ft.explore', sub); } catch (e) {}
-  view.innerHTML = `<nav class="subnav" aria-label="${esc(t('tabExplore'))}">${[['photos', 'tabGallery', 'photo'], ['timeline', 'tabTimeline', 'clock'], ['stats', 'tabStats', 'chart']]
+  view.innerHTML = `<nav class="subnav" aria-label="${esc(t('tabExplore'))}">${[['month', 'thisMonth', 'cake'], ['photos', 'tabGallery', 'photo'], ['timeline', 'tabTimeline', 'clock'], ['stats', 'tabStats', 'chart']]
     .map(([k, l, ic]) => `<a href="#/explore/${k}" ${k === sub ? 'aria-current="page"' : ''}>${icon(ic)}${t(l)}</a>`).join('')}</nav><div class="explore-body"></div>`;
   const body = $('.explore-body', view);
+  if (sub === 'month') renderMonth(body);
   if (sub === 'photos') renderGallery(body);
   if (sub === 'timeline') renderTimeline(body);
   if (sub === 'stats') renderStats(body);

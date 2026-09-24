@@ -57,7 +57,7 @@ export function openPerson(pid) {
   const me = getMe();
   const rel = me && me !== pid ? relToYou(me, pid) : null;
   const pp = parentsOf(pid);
-  const sib = siblingsOf(pid);
+  const sib = siblingsOf(pid), sibs = [...sib.full, ...sib.half];
   const unions = unionsOf(pid);
   const facts = [
     ['birthPlace', p.birthPlace], ['residence', p.residence], ['occupation', p.occupation], ['burialPlace', p.burialPlace],
@@ -106,8 +106,7 @@ export function openPerson(pid) {
       ${parentsHtml ? `<div class="section-title">${t('parents')}</div><ul class="rel-list">${parentsHtml}</ul>` : ''}
       ${spousesHtml ? `<div class="section-title">${t('spouses')}</div><ul class="rel-list">${spousesHtml}</ul>` : ''}
       ${kidsHtml ? `<div class="section-title">${t('children')} (${unions.reduce((n, u) => n + kidsOf(u.id).length, 0)})</div><ul class="rel-list">${kidsHtml}</ul>` : ''}
-      ${sib.full.length ? `<div class="section-title">${t('siblings')}</div><ul class="rel-list">${sib.full.map(s => relRow(s)).join('')}</ul>` : ''}
-      ${sib.half.length ? `<div class="section-title">${t('halfSiblings')}</div><ul class="rel-list">${sib.half.map(s => relRow(s)).join('')}</ul>` : ''}
+      ${sibs.length ? `<div class="section-title">${t('siblings')}</div><ul class="rel-list">${sibs.map(s => relRow(s)).join('')}</ul>` : ''}
       <div class="actions">
         <a class="btn" href="#/chart/${esc(pid)}">${icon('tree')}${t('viewInTree')}</a>
         <a class="btn" href="#/focus/${esc(pid)}">${icon('family')}${t('focusHere')}</a>

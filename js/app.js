@@ -8,6 +8,7 @@ import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPer
 import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
 import { renderSettings, applyTheme, isDark, toggleTheme } from './settings.js';
 import { resolveMedia } from './backend.js';
+import { scheduleReminders } from './month.js';
 
 const view = $('#view');
 const TABS = [
@@ -144,5 +145,6 @@ async function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:' || location.hostname === 'localhost') {
     navigator.serviceWorker?.register('sw.js').catch(() => {});
   }
+  scheduleReminders();
 }
 init();

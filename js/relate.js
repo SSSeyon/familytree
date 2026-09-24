@@ -117,7 +117,7 @@ function enBlood(r, sex) {
     const base = g(sex, 'father', 'mother', 'parent');
     return up === 1 ? base : greats(up - 2) + 'grand' + base;
   }
-  if (up === 1 && down === 1) return (r.half ? 'half-' : '') + g(sex, 'brother', 'sister', 'sibling');
+  if (up === 1 && down === 1) return g(sex, 'brother', 'sister', 'sibling');
   if (up === 1) return greats(down - 3) + (down >= 3 ? 'grand-' : '') + g(sex, 'nephew', 'niece', 'nibling');
   if (down === 1) return greats(up - 2) + g(sex, 'uncle', 'aunt', 'aunt/uncle');
   const deg = Math.min(up, down) - 1, rem = Math.abs(up - down);
@@ -151,7 +151,7 @@ function yoRel(rel, sexB, a, b) {
     if (up === 1 && down === 1) {
       const older = olderThan(b, a);
       const base = older === true ? 'ẹ̀gbọ́n' : older === false ? 'àbúrò' : g(sexB, 'arákùnrin', 'arábìnrin', 'ọmọ ìyá');
-      return rel.half ? base + ' (láti ọ̀dọ̀ òbí kan)' : base;
+      return base;
     }
     if (up === 1) return 'ọmọ ẹ̀gbọ́n/àbúrò' + (down > 2 ? ` (ìran ${down - 1})` : '');
     if (down === 1) return g(sexB, 'bàbá', 'ìyá', 'òbí') + ' (ẹ̀gbọ́n/àbúrò òbí)' + (up > 2 ? ` — ìran ${up - 1}` : '');

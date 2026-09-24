@@ -6,7 +6,8 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 - A zoomable tree chart and a family view centred on one person.
 - Person cards with photos, stories, oríkì and voice notes.
 - A "How are we related?" finder that draws the connection as a small family tree.
-- A timeline, a photo gallery, and stats with birthdays.
+- "This month": birthdays and remembrance days, with one-tap WhatsApp greetings and optional phone reminders.
+- A timeline, a photo gallery and family stats.
 - English, Yorùbá and Gungbe, plus light and dark mode.
 - Share links; PNG, print and GEDCOM export.
 - A "Suggest a change" button that sends to the editors or to WhatsApp.
@@ -18,7 +19,7 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 | Path | What it is |
 |---|---|
 | `index.html`, `css/`, `js/` | The app |
-| `version.js` | App version shown in Settings (`V1.4`). **Bump it on every update**; this also refreshes everyone's offline copy. |
+| `version.js` | App version shown in Settings (`V1.5`). **Bump it on every update**; this also refreshes everyone's offline copy. |
 | `config.js` | Settings: Firebase details, WhatsApp number, start person, privacy |
 | `backend/firestore.rules` | Security rules to paste into Firebase |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable app (PWA) and offline support |
