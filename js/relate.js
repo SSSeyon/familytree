@@ -135,12 +135,24 @@ function olderThan(x, y) {
   return null;
 }
 
+// Gungbe (Yoruba letters, DRAFT): Baba, Iya, Ovi, Tọgbo/Nọgbo, Medaho (older) / Novi (younger).
+function gunRel(rel, sexB, a, b) {
+  if (rel.k === 'spouse') return g(sexB, 'asu', 'asi', 'alọwlemẹ');
+  if (rel.k === 'blood') {
+    const { up, down } = rel;
+    if (up === 0) return down === 1 ? g(sexB, 'ovisunnu', 'ovinyọnu', 'ovi') : down === 2 ? 'ovi ovi' : `ovi ovi (whẹndo ${down})`;
+    if (down === 0) return up === 1 ? g(sexB, 'baba', 'iya', 'mẹjitọ') : g(sexB, 'tọgbo', 'nọgbo', 'mẹjitọ mẹho') + (up > 2 ? ` (whẹndo ${up})` : '');
+    if (up === 1 && down === 1) { const older = olderThan(b, a); return older === true ? 'medaho' : older === false ? 'novi' : 'nọvi'; }
+  }
+  return `hẹnnumẹ (${enRel(rel, sexB, store.P[rel.spouse]?.given || '')})`;
+}
+
 // Relationship word(s) only, e.g. "grandson".
 export function relWord(a, b) {
   const rel = relation(a, b);
   if (!rel || rel.k === 'self') return null;
   const sexB = store.P[b]?.sex;
-  return lang() === 'yo' ? yoRel(rel, sexB, a, b) : enRel(rel, sexB, store.P[rel.spouse]?.given || 'spouse');
+  return lang() === 'yo' ? yoRel(rel, sexB, a, b) : lang() === 'gun' ? gunRel(rel, sexB, a, b) : enRel(rel, sexB, store.P[rel.spouse]?.given || 'spouse');
 }
 
 // Full sentence: "Seyon is Miwawiwe's son".

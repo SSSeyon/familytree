@@ -2,18 +2,20 @@
 
 An interactive family tree website, converted from a Quick Family Tree (`.ftz`) export. It is plain HTML, CSS and JavaScript with no build step, and is hosted free on GitHub Pages.
 
-**What viewers get:** a zoomable tree chart (top-down or sideways), a family view centred on one person, person cards with photos, stories, oríkì and voice notes, a "How are we related?" finder, a timeline, a photo gallery, stats and birthdays, English/Yoruba, dark mode, share links, PNG/print/GEDCOM export, and a "Suggest a change" button (WhatsApp or Google Form).
+**What viewers get:** a zoomable tree chart (top-down or sideways), a family view centred on one person, person cards with photos, stories, oríkì and voice notes, a "How are we related?" finder, a timeline, a photo gallery, stats and birthdays, English/Yoruba, dark mode, share links, PNG/print/GEDCOM export, and a "Suggest a change" button (saved to a Google Sheet, or sent on WhatsApp).
 
-**What you (the editor) get:** a built-in editor that saves straight to this GitHub repo.
+**What you (the editor) get:** a built-in editor unlocked with a family passphrase. It syncs through your Google Drive, and the site installs as a phone app (PWA).
 
 ## Project layout
 
 | Path | What it is |
 |---|---|
 | `index.html`, `css/`, `js/` | The app |
-| `config.js` | Settings: GitHub repo, WhatsApp number, Google Form, privacy |
+| `config.js` | Settings: backend URL, WhatsApp number, start person, privacy |
+| `backend/Code.gs` | Google Apps Script backend (storage, passphrase, uploads, suggestions) |
+| `manifest.webmanifest`, `sw.js`, `icons/` | Installable app (PWA) and offline support |
 | `data/tree.json` | All people and families (public) |
-| `photos/`, `media/` | Face photos and uploaded photos / voice notes (public) |
+| `photos/` | Original face photos (new uploads go to Google Drive) |
 | `tools/convert-ftz.ps1` | Converts a `.ftz` export into `data/tree.json` + `photos/` |
 | `tools/serve.ps1` | Local preview server |
 
@@ -24,39 +26,32 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 3. In the repo: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)`** → Save.
 4. After about a minute the site is live at `https://ssseyon.github.io/familytree/`.
 
-## 2. Turn on the editor
+## 2. Backend setup (editing, sync and suggestions) — one time, about 5 minutes
 
-The editor saves with a GitHub token that only you hold. The token is kept in your browser, never in the site.
+Editing uses a **family passphrase** instead of GitHub tokens. A small Google Apps Script, running in your own Google account, stores the tree in your Google Drive and checks the passphrase privately. The passphrase is never in the website code. Every visitor’s app syncs from it.
 
-1. Go to <https://github.com/settings/personal-access-tokens/new> (a fine-grained token).
-2. **Repository access:** *Only select repositories* → `familytree`.
-3. **Permissions → Repository permissions → Contents: Read and write.**
-4. Generate the token and copy it.
-5. On the site: **⋮ menu → Editor mode**. Paste the token and click Connect.
+1. Open <https://script.google.com> → **New project**. Name it "Family Tree backend".
+2. Delete the sample code and paste in everything from [`backend/Code.gs`](backend/Code.gs). Save.
+3. ⚙ **Project Settings** → **Script properties** → **Add script property**:
+   - Property: `EDIT_PASSPHRASE`
+   - Value: your family passphrase. Save.
+4. Back in the editor, pick the `authorize` function in the toolbar and press **▶ Run**, then allow the Drive / Sheets / Gmail permissions. Google warns that the app is unverified because it is your own script: click **Advanced → Go to Family Tree backend**.
+5. **Deploy → New deployment** → type **Web app**:
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+   - **Deploy**, then copy the **Web app URL** (ends in `/exec`).
+6. Put that URL in `config.js` → `backend: { url: "…/exec" }`, then commit and push.
 
-In editor mode:
-- Tap a person, then ✏️ to edit their names, dates, places, oríkì, story, photo, voice notes and links.
-- Use the **Relatives** buttons to add a father, mother, spouse, child or sibling, or to link someone already in the tree.
-- **Save to GitHub** commits your changes, and the public site updates in about a minute.
-- **Editor tools** lists data problems, unnamed people, site title and the default person.
-- Unsaved edits are kept in your browser as a draft if you close the tab.
-
-## 3. Google Form for suggestions
-
-1. Create a Google Form, e.g. "Family tree suggestions", with these **short answer** questions: *Person*, *Person ID*, *Type*, *Your name*, *Contact*. Add a **paragraph** question: *Suggestion*.
-2. In the form's **Settings → Responses**, make sure sign-in is **not** required.
-3. In the **Responses** tab → ⋮ → **Get email notifications for new responses**.
-4. ⋮ (top right) → **Get pre-filled link**. Type `x` in every field → **Get link** → copy it.
-   The link looks like `https://docs.google.com/forms/d/e/FORM_ID/viewform?usp=pp_url&entry.111=x&entry.222=x…`.
-5. In `config.js`:
-   - Set `formUrl` to the same address, ending in `/formResponse` instead of `/viewform?...`.
-   - Put each `entry.NNN` next to its field (person, personId, type, message, name, contact), matching the order of your questions.
-
-Until the form is set up, the "Suggest a change" dialog offers only WhatsApp.
+That’s it:
+- **Editing:** Settings → Editing → **Editor mode** → enter the passphrase. Changes, photos and voice notes save to the Drive folder **“Family Tree (website data)”** and reach everyone on their next visit. Every previous version is kept in `history/`.
+- **Suggestions:** they go into a **“Suggestions”** Google Sheet in the same folder, and you get an email for each one.
+- **Changing the passphrase:** edit the `EDIT_PASSPHRASE` script property. No redeploy is needed.
+- **If you edit Code.gs later:** Deploy → Manage deployments → ✏️ → Version: **New version** → Deploy. This keeps the same URL.
+- **Wrong guesses:** after 10 wrong passphrases the backend locks editing for 15 minutes.
 
 ## Privacy
 
-- Everything in this repo is **public**: names, photos, stories, and the WhatsApp number in `config.js`.
+- The website and anything saved through it are **public to anyone with the link**: names, photos, stories, voice notes and the WhatsApp number in `config.js`. The passphrase and suggestions stay private in your Google account.
 - People with no death date who were born less than 100 years ago count as **living**. Their **birth year is never published**; only the day and month show, as a birthday. The converter and the editor both strip the year before saving. Set `privacy.keepLivingBirthYears: true` in `config.js` to change this.
 - The page asks search engines not to index it (`noindex`), but anyone with the link can view it.
 
@@ -66,7 +61,7 @@ Until the form is set up, the "Suggest a change" dialog offers only WhatsApp.
 powershell -ExecutionPolicy Bypass -File tools\convert-ftz.ps1 -Ftz "path\to\FamilyTree.ftz"
 ```
 
-⚠️ This **replaces** `data/tree.json`, so anything added in the web editor is lost. Once you use the web editor, treat it as the main copy.
+`data/tree.json` is only the starting copy. Once the backend is set up, the live tree lives in Google Drive, and this command does **not** change it.
 
 ## Local preview
 
@@ -78,4 +73,4 @@ Then open <http://localhost:8080>.
 
 ## Translations
 
-The Yoruba interface text and kinship terms were drafted by machine and should be checked by a fluent speaker. They are in `js/i18n.js` (interface) and `js/relate.js` (`yoRel`, kinship terms).
+The Yoruba and Gungbe (written with Yoruba letters) text is a machine-drafted first pass and should be checked by fluent speakers. Untranslated Gungbe strings fall back to English. The text is in `js/i18n.js` (interface) and `js/relate.js` (`yoRel`, `gunRel` kinship terms).

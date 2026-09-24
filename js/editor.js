@@ -1,9 +1,10 @@
-// Built-in editor: edit people & links, upload photos/voice notes, save to GitHub.
-import { store, person, union, parentsOf, unionsOf, spouseIn, kidsOf, displayName, isLiving, newId, changed, setTree, search, contextLine, allPeople, isNamed, childrenOf, parentIds } from './data.js';
+// Built-in editor: edit people & links, upload photos/voice notes, save to the backend.
+import { store, person, union, parentsOf, unionsOf, spouseIn, kidsOf, displayName, isLiving, newId, changed, setTree, search, contextLine, allPeople, isNamed, childrenOf, parentIds, cacheTree } from './data.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch, download, nameOf } from './ui.js';
 import { getMe, setMe, closePerson } from './person.js';
 import { searchRow } from './views.js';
+import { hasBackend, fetchRemoteTree, post } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
 const ED = { on: false, dirty: 0, baseRev: 0, uploads: new Map() };
@@ -11,13 +12,14 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export const isEditing = () => ED.on;
 
-// ---------- settings & draft ----------
-function ghSettings() {
-  let s = {};
-  try { s = JSON.parse(localStorage.getItem('ft.gh') || '{}'); } catch (e) {}
-  return { owner: s.owner || CFG.github?.owner || '', repo: s.repo || CFG.github?.repo || '', branch: s.branch || CFG.github?.branch || 'main', token: s.token || '' };
+// ---------- passphrase & draft ----------
+function getPass() { try { return sessionStorage.getItem('ft.pass') || localStorage.getItem('ft.pass') || ''; } catch (e) { return ''; } }
+function setPass(p, remember) {
+  try {
+    sessionStorage.removeItem('ft.pass'); localStorage.removeItem('ft.pass');
+    if (p) (remember ? localStorage : sessionStorage).setItem('ft.pass', p);
+  } catch (e) {}
 }
-function saveGhSettings(s) { try { localStorage.setItem('ft.gh', JSON.stringify(s)); } catch (e) {} }
 
 function saveDraft() {
   try {
@@ -31,25 +33,27 @@ function readDraft() { try { return JSON.parse(localStorage.getItem('ft.draft') 
 // ---------- mode ----------
 export async function enterEditor(rerender) {
   ED.rerender = rerender;
-  const s = ghSettings();
-  if (!s.token) { openGhSetup(() => enterEditor(rerender)); return; }
-  ED.on = true;
-  try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
-  ED.baseRev = store.tree.meta?.rev || 0;
-  // pull the freshest copy straight from GitHub (the public site lags ~1 min)
-  try {
-    const remote = await getFile('data/tree.json');
-    if (remote) {
-      const tree = JSON.parse(decodeB64(remote.content));
-      if ((tree.meta?.rev || 0) >= ED.baseRev) { setTree(tree); ED.baseRev = tree.meta?.rev || 0; }
-    }
-  } catch (e) {
-    toast(t('genericError', { msg: e.message }), 5000);
-    if (/401|403/.test(e.message)) { ED.on = false; updateBar(); openGhSetup(() => enterEditor(rerender)); return; }
+  if (!hasBackend()) {
+    modal({ title: t('menuEditor'), body: `<p>${esc(t('noBackend'))}</p>` });
+    return;
   }
+  if (!getPass()) { openUnlock(() => enterEditor(rerender)); return; }
+  try {
+    const r = await post({ action: 'verify', pass: getPass() });
+    if (!r.ok) {
+      if (r.error === 'wrong-passphrase') { setPass(''); toast(t('wrongPass'), 4000); openUnlock(() => enterEditor(rerender)); return; }
+      throw new Error(r.error);
+    }
+    // start from the freshest copy
+    const remote = await fetchRemoteTree();
+    if (remote && (remote.meta?.rev || 0) >= (store.tree.meta?.rev || 0)) { setTree(remote); cacheTree(); }
+  } catch (e) { toast(t('genericError', { msg: e.message }), 5000); return; }
+  ED.on = true;
+  ED.baseRev = store.tree.meta?.rev || 0;
+  try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
   const draft = readDraft();
   if (draft?.dirty && await confirmBox(t('draftFound'), t('restore'))) {
-    setTree(draft.tree); ED.dirty = draft.dirty; ED.baseRev = draft.baseRev || ED.baseRev;
+    setTree(draft.tree); ED.dirty = draft.dirty; ED.baseRev = draft.baseRev ?? ED.baseRev;
     (draft.uploads || []).forEach(u => ED.uploads.set(u.path, { dataUrl: u.dataUrl }));
   } else if (draft) clearDraft();
   updateBar(); changed();
@@ -57,12 +61,13 @@ export async function enterEditor(rerender) {
 
 export function exitEditor() {
   if (ED.dirty && !confirm(t('edUnsaved', { n: ED.dirty }) + ' — ' + t('edDiscard') + '?')) return;
+  try { localStorage.removeItem('ft.editing'); } catch (e) {}
+  setPass('');
   if (ED.dirty) { clearDraft(); location.reload(); return; }
   ED.on = false;
-  try { localStorage.removeItem('ft.editing'); } catch (e) {}
   updateBar(); changed();
 }
-export const wantsEditor = () => { try { return localStorage.getItem('ft.editing') === '1'; } catch (e) { return false; } };
+export const wantsEditor = () => { try { return localStorage.getItem('ft.editing') === '1' && !!getPass(); } catch (e) { return false; } };
 
 function commit() { ED.dirty++; saveDraft(); updateBar(); changed(); }
 
@@ -74,39 +79,16 @@ export function updateBar() {
     <span class="muted">${ED.dirty ? t('edUnsaved', { n: ED.dirty }) : t('edSaved')}</span><span class="spacer"></span>
     <button class="btn sm" data-e="new">${icon('plus')}${t('edNewPerson')}</button>
     <a class="btn sm" href="#/editor">${t('edTools')}</a>
-    ${ED.dirty ? `<button class="btn sm" data-e="discard">${t('edDiscard')}</button><button class="btn sm primary" data-e="save">${icon('github')}${t('edSaveGh')}</button>` : ''}
+    ${ED.dirty ? `<button class="btn sm" data-e="discard">${t('edDiscard')}</button><button class="btn sm primary" data-e="save">${icon('upload')}${t('edSaveGh')}</button>` : ''}
     <button class="btn sm ghost" data-e="exit" aria-label="${t('menuEditorOff')}">${icon('close')}</button>`;
   bar.onclick = async e => {
     const a = e.target.closest('[data-e]')?.dataset.e;
-    if (a === 'save') saveToGitHub();
+    if (a === 'save') saveAll();
     if (a === 'discard' && await confirmBox(t('edDiscard') + '?', t('edDiscard'))) { clearDraft(); ED.dirty = 0; ED.uploads.clear(); location.reload(); }
     if (a === 'exit') exitEditor();
     if (a === 'new') { const id = createPerson({}); commit(); editPerson(id); }
   };
 }
-
-// ---------- GitHub API ----------
-async function gh(path, opts = {}) {
-  const s = ghSettings();
-  const res = await fetch(`https://api.github.com/repos/${s.owner}/${s.repo}/${path}`, {
-    ...opts,
-    headers: { Authorization: `Bearer ${s.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub ${res.status}: ${(await res.json().catch(() => ({}))).message || res.statusText}`);
-  return res.json();
-}
-const getFile = path => gh(`contents/${path}?ref=${encodeURIComponent(ghSettings().branch)}&t=${Date.now()}`);
-async function putFile(path, b64, message, sha) {
-  return gh(`contents/${path}`, { method: 'PUT', body: JSON.stringify({ message, content: b64, branch: ghSettings().branch, ...(sha ? { sha } : {}) }) });
-}
-function encodeB64(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-function decodeB64(b64) { return new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), c => c.charCodeAt(0))); }
 
 // Remove data that must not be published.
 function sanitized(tree) {
@@ -118,68 +100,61 @@ function sanitized(tree) {
   return out;
 }
 
-async function saveToGitHub() {
-  const bar = $('#edit-bar');
-  const btn = $('[data-e="save"]', bar);
+async function saveAll() {
+  const btn = $('[data-e="save"]', $('#edit-bar'));
   if (btn) { btn.disabled = true; btn.textContent = t('edSaving'); }
   try {
-    const remote = await getFile('data/tree.json');
-    const remoteRev = remote ? JSON.parse(decodeB64(remote.content)).meta?.rev || 0 : 0;
-    if (remote && remoteRev > ED.baseRev && !(await confirmBox(t('conflict'), t('save')))) throw new Error('cancelled');
-    // 1. uploads (photos, voice notes)
-    const rev = Math.max(remoteRev, ED.baseRev) + 1;
+    const pass = getPass();
+    // 1. uploads (photos, voice notes) → Google Drive
+    const done = new Map();
     for (const [path, u] of ED.uploads) {
-      const existing = await getFile(path);
-      await putFile(path, u.dataUrl.split(',')[1], `Upload ${path}`, existing?.sha);
+      const [meta, data] = u.dataUrl.split(',');
+      const mime = meta.slice(5).split(';')[0];
+      const r = await post({ action: 'upload', pass, name: path.split('/').pop(), mime, data });
+      if (!r.ok) throw new Error(r.error);
+      done.set(u.dataUrl, r.url);
     }
-    // swap temporary data: URLs for real paths
-    const swap = src => { for (const [path, u] of ED.uploads) if (src === u.dataUrl) return `${path}?v=${rev}`; return src; };
     for (const p of Object.values(store.P)) {
-      if (p.photo?.startsWith('data:')) p.photo = swap(p.photo);
-      (p.media || []).forEach(m => { if (m.src?.startsWith('data:')) m.src = swap(m.src); });
+      if (done.has(p.photo)) p.photo = done.get(p.photo);
+      (p.media || []).forEach(m => { if (done.has(m.src)) m.src = done.get(m.src); });
     }
-    // 2. data file
-    store.tree.meta = { ...(store.tree.meta || {}), rev, updated: new Date().toISOString().slice(0, 10) };
+    ED.uploads.clear();
+    // 2. the tree itself
     const clean = sanitized(store.tree);
-    await putFile('data/tree.json', encodeB64(JSON.stringify(clean)), `Update family tree (${ED.dirty} change${ED.dirty > 1 ? 's' : ''})`, remote?.sha);
-    setTree(clean);
-    ED.baseRev = rev; ED.dirty = 0; ED.uploads.clear(); clearDraft();
-    toast(t('edSavedOk'), 5000);
+    let r = await post({ action: 'save', pass, tree: clean, baseRev: ED.baseRev });
+    if (!r.ok && r.error === 'conflict') {
+      if (!(await confirmBox(t('conflict'), t('save')))) throw new Error('cancelled');
+      r = await post({ action: 'save', pass, tree: clean, baseRev: ED.baseRev, force: true });
+    }
+    if (!r.ok) throw new Error(r.error === 'wrong-passphrase' ? t('wrongPass') : r.error);
+    clean.meta = { ...(clean.meta || {}), rev: r.rev, updated: new Date().toISOString().slice(0, 10) };
+    setTree(clean); cacheTree();
+    ED.baseRev = r.rev; ED.dirty = 0; clearDraft();
+    toast(t('edSavedOk'), 4000);
   } catch (e) {
     if (e.message !== 'cancelled') toast(t('genericError', { msg: e.message }), 6000);
+    saveDraft();
   }
   updateBar(); changed();
 }
 
-// ---------- GitHub setup ----------
-export function openGhSetup(after) {
-  const s = ghSettings();
+// ---------- unlock ----------
+export function openUnlock(after) {
   const body = html(`<form style="display:grid;gap:.8rem">
-    <p class="small muted">${t('edTokenHelp')}</p>
-    <div class="grid-3">
-      <label class="field"><span>${t('edOwner')}</span><input type="text" name="owner" value="${esc(s.owner)}" required></label>
-      <label class="field"><span>${t('edRepo')}</span><input type="text" name="repo" value="${esc(s.repo)}" required></label>
-      <label class="field"><span>${t('edBranch')}</span><input type="text" name="branch" value="${esc(s.branch)}" required></label>
-    </div>
-    <label class="field"><span>${t('edToken')}</span><input type="password" name="token" value="${esc(s.token)}" autocomplete="off" placeholder="github_pat_…" required></label>
-    <p class="small"><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token on GitHub ↗</a> — Repository access: only <em>${esc(s.repo || 'your repo')}</em>; Permissions → Contents: Read and write.</p>
-    <div class="small" data-status></div>
+    <p class="small muted">${t('passHelp')}</p>
+    <label class="field"><span>${t('passphrase')}</span><input type="password" name="pass" autocomplete="current-password" required></label>
+    <label class="row small"><input type="checkbox" name="remember"> ${t('rememberDevice')}</label>
   </form>`);
-  const m = modal({ title: t('edSetup'), body, foot: `<button class="btn" data-close>${t('cancel')}</button><button class="btn primary" data-go>${t('edConnect')}</button>` });
-  $('[data-go]', m.el).onclick = async () => {
-    const d = Object.fromEntries(new FormData(body));
-    if (!d.owner || !d.repo || !d.token) return;
-    saveGhSettings({ owner: d.owner.trim(), repo: d.repo.trim(), branch: d.branch.trim() || 'main', token: d.token.trim() });
-    const st = $('[data-status]', body);
-    st.textContent = '…';
-    try {
-      const repo = await gh('');
-      if (!repo) throw new Error('Repository not found (check owner/name and token access).');
-      if (!repo.permissions?.push) throw new Error('This token cannot write to the repository.');
-      st.textContent = t('edConnected');
-      m.close(); after?.();
-    } catch (e) { st.innerHTML = `<span class="issue">${esc(e.message)}</span>`; }
+  const m = modal({ title: t('menuEditor'), body, foot: `<button class="btn" data-close>${t('cancel')}</button><button class="btn primary" data-go>${icon('lock')}${t('unlock')}</button>` });
+  const go = () => {
+    const d = new FormData(body);
+    if (!d.get('pass')) return;
+    setPass(d.get('pass'), !!d.get('remember'));
+    try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
+    m.close(); after?.();
   };
+  $('[data-go]', m.el).onclick = go;
+  body.onsubmit = e => { e.preventDefault(); go(); };
 }
 
 // ---------- mutations ----------
@@ -481,8 +456,6 @@ export function findIssues() {
 
 export function renderEditorPage(view, rerender) {
   if (!ED.on) { view.innerHTML = `<div class="page"><div class="empty"><p>${t('menuEditor')}</p><button class="btn primary" data-on>${icon('edit')}${t('menuEditor')}</button></div></div>`; $('[data-on]', view).onclick = () => enterEditor(rerender); return; }
-  const s = ghSettings();
-  const gf = CFG.googleForm || {};
   const issues = findIssues();
   const unnamed = allPeople().filter(p => !isNamed(p));
   const meta = store.tree.meta || (store.tree.meta = {});
@@ -494,10 +467,9 @@ export function renderEditorPage(view, rerender) {
           <div class="picker"><input type="search" data-focus-search placeholder="${esc(t('searchPh'))}"><ul class="search-results" hidden></ul></div></label>
         <div class="row" style="margin-top:1rem"><button class="btn sm" data-json>${icon('download')}${t('menuJson')}</button></div>
       </section>
-      <section class="card-box"><h2>${t('edSetup')}</h2>
-        <p class="small">${esc(s.owner)}/${esc(s.repo)} · ${esc(s.branch)} · ${s.token ? 'token ✓' : 'no token'}</p>
-        <button class="btn sm" data-gh>${icon('github')}${t('edSetup')}</button>
-        <h3 style="margin-top:1.2rem">${t('formSetup')}</h3><p class="small ${gf.formUrl ? '' : 'issue'}">${gf.formUrl ? t('formOk') : t('formMissing')}</p>
+      <section class="card-box"><h2>${t('backend')}</h2>
+        <p class="small">${t('backendOk')} · rev ${store.tree.meta?.rev || 0} · ${esc(store.tree.meta?.updated || '')}</p>
+        <p class="small muted">${t('backendHelp')}</p>
       </section>
     </div>
     <section class="card-box" style="margin-top:1rem"><h2>${t('needsAttention')}</h2>
@@ -508,7 +480,6 @@ export function renderEditorPage(view, rerender) {
     </section></div>`;
   $('[data-title]', view).onchange = e => { meta.title = e.target.value.trim(); commit(); };
   $('[data-json]', view).onclick = () => download('tree.json', JSON.stringify(sanitized(store.tree), null, 1), 'application/json');
-  $('[data-gh]', view).onclick = () => openGhSetup(() => renderEditorPage(view, rerender));
   $$('[data-edit]', view).forEach(b => b.onclick = () => editPerson(b.dataset.edit));
   const fs = $('[data-focus-search]', view);
   attachSearch(fs, fs.nextElementSibling, p => { meta.focusId = p.id; commit(); }, { searchFn: q => search(q), render: searchRow });

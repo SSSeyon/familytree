@@ -1,0 +1,16 @@
+{
+  "name": "Azandowanu Family Tree",
+  "short_name": "Azandowanu",
+  "description": "Azandowanu Family, Gbago — relatives, photos, stories and how we are related.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f3ee",
+  "theme_color": "#105e48",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

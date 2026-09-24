@@ -1,17 +1,17 @@
-// App shell: routing, top bar, search, menu, theme, language.
-import { store, loadTree, onChange, person, displayName, search, contextLine, mainFounder } from './data.js';
-import { t, lang, setLang } from './i18n.js';
-import { esc, icon, avatar, $, $$, toast, modal, attachSearch, nameOf } from './ui.js';
-import { renderChart, centerOn, exportPng, chartState } from './chart.js';
-import { renderFocus, renderRelate, renderTimeline, renderGallery, renderStats, searchRow } from './views.js';
-import { openPerson, closePerson, setPersonHooks, getMe, setMe, openSuggest } from './person.js';
-import { downloadGedcom, downloadJson } from './export.js';
-import { isEditing, enterEditor, exitEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
+// App shell: routing, top bar, tabs, search, sync, PWA.
+import { store, loadTree, syncRemote, onChange, person, displayName, search, changed } from './data.js';
+import { t, lang } from './i18n.js';
+import { esc, icon, avatar, $, $$, toast, attachSearch } from './ui.js';
+import { renderChart } from './chart.js';
+import { renderFocus, renderRelate, renderExplore, searchRow } from './views.js';
+import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPerson } from './person.js';
+import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
+import { renderSettings, applyTheme } from './settings.js';
 
 const view = $('#view');
 const TABS = [
   ['chart', 'tabChart', 'tree'], ['focus', 'tabFocus', 'family'], ['relate', 'tabRelate', 'link'],
-  ['timeline', 'tabTimeline', 'clock'], ['gallery', 'tabGallery', 'photo'], ['stats', 'tabStats', 'chart'],
+  ['explore', 'tabExplore', 'compass'], ['settings', 'tabSettings', 'settings'],
 ];
 let current = { name: null };
 
@@ -29,126 +29,91 @@ function route() {
     case 'person': {
       const pid = r.args[0];
       if (!person(pid)) { location.hash = '#/chart'; return; }
-      if (!prev || prev === 'editor') { show('focus'); renderFocus(view, pid); }
+      if (!prev || prev === 'editor' || prev === 'settings') { show('focus'); renderFocus(view, pid); }
       openPerson(pid);
-      return; // keep underlying view
+      return; // keep the view underneath
     }
     case 'line': show('chart'); renderChart(view, { root: r.args[0], focusId: r.args[1], onOpen: openPerson, onRoot }); break;
-    case 'chart': show('chart'); renderChart(view, { focusId: r.args[0], onOpen: openPerson, onRoot }); break;
-    case 'focus': show('focus'); renderFocus(view, r.args[0] && person(r.args[0]) ? r.args[0] : defaultPerson()); break;
+    case 'chart': show('chart'); renderChart(view, { focusId: r.args[0] || (!prev ? lastPersonIfSet() : undefined), onOpen: openPerson, onRoot }); break;
+    case 'focus': show('focus'); renderFocus(view, r.args[0] && person(r.args[0]) ? r.args[0] : lastPerson()); break;
     case 'relate': show('relate'); renderRelate(view, r.args[0], r.args[1]); break;
-    case 'timeline': show('timeline'); renderTimeline(view); break;
-    case 'gallery': show('gallery'); renderGallery(view); break;
-    case 'stats': show('stats'); renderStats(view); break;
-    case 'editor': show('editor'); renderEditorPage(view, route); break;
+    case 'explore': show('explore'); renderExplore(view, r.args[0]); break;
+    case 'gallery': location.replace('#/explore/photos'); return;
+    case 'timeline': location.replace('#/explore/timeline'); return;
+    case 'stats': location.replace('#/explore/stats'); return;
+    case 'settings': show('settings'); renderSettings(view, route); break;
+    case 'editor': show('settings'); renderEditorPage(view, route); break;
     default: location.hash = '#/chart'; return;
   }
+  try { if (r.name !== 'editor') localStorage.setItem('ft.hash', location.hash); } catch (e) {}
   view.scrollTop = 0;
 }
 function onRoot(rootId, focusId) { location.hash = focusId ? `#/line/${rootId}/${focusId}` : `#/line/${rootId}`; }
-function defaultPerson() { return getMe() || (person(store.tree.meta?.focusId) ? store.tree.meta.focusId : mainFounder()); }
+// On the very first chart of a returning visit, centre on the person they last looked at.
+function lastPersonIfSet() { try { return localStorage.getItem('ft.last') || undefined; } catch (e) { return undefined; } }
 
 function show(name) {
   current.name = name;
-  const tab = name === 'line' ? 'chart' : name;
-  $$('.tabs a, .bottom-tabs a').forEach(a => a.getAttribute('data-tab') === tab ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  $$('.tabs a, .bottom-tabs a').forEach(a => a.getAttribute('data-tab') === name ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
 }
 
 // ---------- shell ----------
 function drawShell() {
-  const title = store.tree?.meta?.title || 'Family Tree';
+  const title = store.tree?.meta?.title || 'Azandowanu Family';
   document.title = title;
   $('#site-title').textContent = title;
   const tabHtml = TABS.map(([k, l, ic]) => `<a href="#/${k}" data-tab="${k}">${icon(ic)}<span>${t(l)}</span></a>`).join('');
   $('#tabs').innerHTML = tabHtml;
-  $('#bottom-tabs').innerHTML = TABS.map(([k, l, ic]) => `<a href="#/${k}" data-tab="${k}">${icon(ic)}<span>${t(l)}</span></a>`).join('');
+  $('#bottom-tabs').innerHTML = tabHtml;
   $('#search').placeholder = t('searchPh');
-  $('#lang-btn').textContent = lang() === 'en' ? 'YO' : 'EN';
-  $('#lang-btn').title = lang() === 'en' ? 'Yorùbá' : 'English';
-  const dark = isDark();
-  $('#theme-btn').innerHTML = icon(dark ? 'sun' : 'moon');
-  $('#theme-btn').title = dark ? t('themeLight') : t('themeDark');
-  $('#menu-btn').innerHTML = icon('menu');
   const me = getMe();
-  $('#me-chip').textContent = me ? t('youAre', { name: displayName(person(me)) }) : t('pickMe');
-  $('#me-chip').classList.toggle('on', !!me);
-  show(current.name || parse().name);
-}
-
-const isDark = () => document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-
-function openMenu() {
-  const menu = $('#menu');
-  if (!menu.hidden) { menu.hidden = true; return; }
-  menu.innerHTML = `
-    <button data-m="print">${icon('print')}${t('menuPrint')}</button>
-    <button data-m="png">${icon('download')}${t('menuPng')}</button>
-    <button data-m="ged">${icon('download')}${t('menuGed')}</button>
-    <hr>
-    <button data-m="suggest">${icon('chat')}${t('menuSuggest')}</button>
-    <button data-m="about">${icon('info')}${t('menuAbout')}</button>
-    <hr>
-    <button data-m="editor">${icon('lock')}${isEditing() ? t('menuEditorOff') : t('menuEditor')}</button>`;
-  menu.hidden = false;
-  const off = e => { if (!menu.contains(e.target) && !e.target.closest('#menu-btn')) { menu.hidden = true; document.removeEventListener('click', off, true); } };
-  document.addEventListener('click', off, true);
-  menu.onclick = e => {
-    const m = e.target.closest('[data-m]')?.dataset.m;
-    if (!m) return;
-    menu.hidden = true;
-    if (m === 'print') window.print();
-    if (m === 'png') { if (current.name !== 'chart') location.hash = '#/chart'; setTimeout(exportPng, current.name === 'chart' ? 0 : 400); }
-    if (m === 'ged') downloadGedcom();
-    if (m === 'suggest') openSuggest(null);
-    if (m === 'about') modal({ title: store.tree.meta?.title || 'Family Tree', body: `<p>${esc(t('about'))}</p><p class="small muted">${esc(store.tree.meta?.updated ? 'Updated ' + store.tree.meta.updated : '')}</p>` });
-    if (m === 'editor') isEditing() ? exitEditor() : enterEditor(route);
-  };
-}
-
-function openMePicker() {
-  const me = getMe();
-  const m = modal({
-    title: t('whoAreYou'),
-    body: `<p class="muted small">${t('meHint')}</p>
-      ${me ? `<div class="picked">${avatar(person(me), 'sm')}<div>${nameOf(person(me))}</div><button class="btn sm" data-clear>${t('notMe')}</button></div>` : ''}
-      <div class="picker"><input type="search" data-me placeholder="${esc(t('searchPh'))}"><ul class="search-results" hidden></ul></div>`,
-  });
-  const inp = $('[data-me]', m.el);
-  attachSearch(inp, inp.nextElementSibling, p => { setMe(p.id); m.close(); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: searchRow });
-  $('[data-clear]', m.el)?.addEventListener('click', () => { setMe(null); m.close(); });
+  $('#me-btn').innerHTML = me
+    ? `${avatar(person(me), 'sm')}<span class="me-name">${esc(displayName(person(me)))}</span>`
+    : `${icon('user')}<span class="me-name">${t('chooseYourself')}</span>`;
+  $('#me-btn').title = me ? t('youAre', { name: displayName(person(me)) }) : t('chooseYourself');
+  $('#me-btn').classList.toggle('on', !!me);
+  if (current.name) show(current.name);
 }
 
 function wire() {
   attachSearch($('#search'), $('#search-results'), p => {
+    rememberPerson(p.id);
     if (current.name === 'chart') {
       const same = location.hash === `#/chart/${p.id}`;
       location.hash = `#/chart/${p.id}`;
       if (same) route();
-    }
-    else location.hash = `#/focus/${p.id}`;
+    } else location.hash = `#/focus/${p.id}`;
   }, { searchFn: q => search(q), render: searchRow });
-  $('#menu-btn').onclick = openMenu;
-  $('#me-chip').onclick = openMePicker;
-  $('#theme-btn').onclick = () => {
-    const next = isDark() ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem('ft.theme', next); } catch (e) {}
-    drawShell(); if (current.name === 'chart') route();
-  };
-  $('#lang-btn').onclick = () => { setLang(lang() === 'en' ? 'yo' : 'en'); drawShell(); updateBar(); route(); };
+  $('#me-btn').onclick = () => { const me = getMe(); location.hash = me ? `#/person/${me}` : '#/settings'; };
   window.addEventListener('hashchange', route);
   window.addEventListener('ft:me', () => { drawShell(); if (current.name !== 'chart') route(); });
+  window.addEventListener('ft:lang', () => { drawShell(); updateBar(); route(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   onChange(() => { drawShell(); route(); });
   setPersonHooks({ isEditing, edit: editPerson });
 }
 
+async function sync() {
+  if (isEditing()) return;
+  try { if (await syncRemote()) { changed(); toast(t('updated')); } }
+  catch (e) { if (!navigator.onLine) toast(t('offline')); }
+}
+
 async function init() {
-  document.documentElement.lang = lang();
+  document.documentElement.lang = lang() === 'gun' ? 'guw' : lang();
+  applyTheme();
   try { await loadTree(); }
   catch (e) { view.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   wire();
   drawShell();
+  // new visitors start on the tree; returning visitors pick up where they left off
+  if (!location.hash) { let h = null; try { h = localStorage.getItem('ft.hash'); } catch (e) {} if (h) history.replaceState(null, '', h); }
   route();
   if (wantsEditor()) enterEditor(route);
+  sync();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+  if ('serviceWorker' in navigator && location.protocol === 'https:' || location.hostname === 'localhost') {
+    navigator.serviceWorker?.register('sw.js').catch(() => {});
+  }
 }
 init();

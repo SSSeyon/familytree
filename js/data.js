@@ -5,11 +5,32 @@ export const store = { tree: null, P: {}, U: {} };
 const idx = { kids: new Map(), unionsOf: new Map(), desc: new Map(), founders: null };
 const listeners = new Set();
 
+const rev = t => t?.meta?.rev || 0;
+
+// Bundled data/tree.json, or the newer copy this browser last synced.
 export async function loadTree() {
-  const res = await fetch('data/tree.json', { cache: 'no-cache' });
-  if (!res.ok) throw new Error('Could not load data/tree.json');
-  setTree(await res.json());
+  let bundled = null, cached = null;
+  try { cached = JSON.parse(localStorage.getItem('ft.cache') || 'null'); } catch (e) {}
+  try {
+    const res = await fetch('data/tree.json', { cache: 'no-cache' });
+    if (res.ok) bundled = await res.json();
+  } catch (e) { /* offline: rely on the cache */ }
+  const best = cached && (!bundled || rev(cached) > rev(bundled)) ? cached : bundled;
+  if (!best) throw new Error('Could not load the family tree.');
+  setTree(best);
 }
+
+// Pull the latest tree from the backend. Returns true when it changed.
+export async function syncRemote() {
+  const { hasBackend, fetchRemoteTree } = await import('./backend.js');
+  if (!hasBackend()) return false;
+  const remote = await fetchRemoteTree();
+  if (!remote || rev(remote) <= rev(store.tree)) return false;
+  setTree(remote);
+  cacheTree();
+  return true;
+}
+export function cacheTree() { try { localStorage.setItem('ft.cache', JSON.stringify(store.tree)); } catch (e) {} }
 
 export function setTree(tree) {
   store.tree = tree;
@@ -102,7 +123,7 @@ const MONTHS = {
 };
 export function fmtDate(d) {
   if (!d) return '';
-  const m = d.m ? MONTHS[lang()][d.m - 1] : '';
+  const m = d.m ? (MONTHS[lang()] || MONTHS.en)[d.m - 1] : '';
   return [d.d || '', m, d.y || ''].filter(Boolean).join(' ');
 }
 // Short life span, e.g. "1962 – 2020", "d. 2002", "b. 1935".

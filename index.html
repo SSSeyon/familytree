@@ -3,40 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Family Tree</title>
+  <title>Azandowanu Family</title>
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Our family tree — browse relatives, photos, stories and how we are related.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='10' r='8' fill='%232f7a55'/%3E%3Crect x='14' y='16' width='4' height='12' rx='2' fill='%237a5230'/%3E%3C/svg%3E">
+  <meta name="description" content="Azandowanu Family, Gbago — browse relatives, photos, stories and how we are related.">
+  <meta name="theme-color" content="#105e48">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Azandowanu">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
   <script>
-    try { const t = localStorage.getItem('ft.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    try { const t = localStorage.getItem('ft.theme'); if (t && t !== 'system') document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
   <script src="config.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#/chart" id="brand"><span class="brand-mark" aria-hidden="true"></span><span id="site-title">Family Tree</span></a>
+    <a class="brand" href="#/chart" id="brand"><img src="icons/icon-192.png" alt="" width="36" height="36"><span id="site-title">Azandowanu Family</span></a>
     <div class="search" role="search">
-      <input id="search" type="search" autocomplete="off" data-i18n-ph="searchPh" placeholder="Search a name…" aria-label="Search">
+      <input id="search" type="search" autocomplete="off" placeholder="Search a name…" aria-label="Search">
       <ul id="search-results" class="search-results" role="listbox" hidden></ul>
     </div>
     <nav class="tabs" id="tabs" aria-label="Views"></nav>
-    <div class="top-actions">
-      <button class="chip" id="me-chip" type="button"></button>
-      <button class="icon-btn" id="lang-btn" type="button" aria-label="Language">EN</button>
-      <button class="icon-btn" id="theme-btn" type="button" aria-label="Theme"></button>
-      <button class="icon-btn" id="menu-btn" type="button" aria-label="Menu" aria-haspopup="true"></button>
-    </div>
+    <button class="me-btn" id="me-btn" type="button"></button>
   </header>
 
   <div id="edit-bar" class="edit-bar" hidden></div>
   <main id="view" class="view" tabindex="-1"></main>
   <nav class="bottom-tabs" id="bottom-tabs" aria-label="Views"></nav>
 
-  <div id="menu" class="menu" hidden></div>
   <div id="overlay" class="overlay" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

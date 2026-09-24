@@ -2,7 +2,7 @@
 import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, lifeSpan, isLiving, fmtDate, search, contextLine, allPeople, founders, mainFounder, isNamed, descendants, childrenOf } from './data.js';
 import { relSentence, relWord, relToYou, shortestPath } from './relate.js';
 import { branchColour } from './chart.js';
-import { getMe, openSuggest, datesLine } from './person.js';
+import { getMe, openSuggest, datesLine, rememberPerson } from './person.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, attachSearch, nameOf } from './ui.js';
 
@@ -28,6 +28,7 @@ const ghost = label => `<div class="pcard ghost sm"><div class="ph">?</div><div 
 export function renderFocus(view, pid) {
   const p = person(pid);
   if (!p) { view.innerHTML = `<div class="empty">${t('noResults')}</div>`; return; }
+  rememberPerson(pid);
   const pp = parentsOf(pid);
   const gp = side => { const q = side && parentsOf(side); return q ? [q.father, q.mother].filter(Boolean) : []; };
   const grand = pp ? [...gp(pp.father), ...gp(pp.mother)] : [];
@@ -186,3 +187,15 @@ export function renderStats(view) {
 }
 
 export { searchRow };
+
+// ---------- Explore: photos / timeline / stats in one tab ----------
+export function renderExplore(view, sub) {
+  sub = ['photos', 'timeline', 'stats'].includes(sub) ? sub : (() => { try { return localStorage.getItem('ft.explore') || 'photos'; } catch (e) { return 'photos'; } })();
+  try { localStorage.setItem('ft.explore', sub); } catch (e) {}
+  view.innerHTML = `<nav class="subnav" aria-label="${esc(t('tabExplore'))}">${[['photos', 'tabGallery', 'photo'], ['timeline', 'tabTimeline', 'clock'], ['stats', 'tabStats', 'chart']]
+    .map(([k, l, ic]) => `<a href="#/explore/${k}" ${k === sub ? 'aria-current="page"' : ''}>${icon(ic)}${t(l)}</a>`).join('')}</nav><div class="explore-body"></div>`;
+  const body = $('.explore-body', view);
+  if (sub === 'photos') renderGallery(body);
+  if (sub === 'timeline') renderTimeline(body);
+  if (sub === 'stats') renderStats(body);
+}

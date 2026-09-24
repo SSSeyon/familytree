@@ -2,7 +2,7 @@
 param([int]$Port = 8080)
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $types = @{ '.html' = 'text/html; charset=utf-8'; '.js' = 'text/javascript; charset=utf-8'; '.css' = 'text/css; charset=utf-8'; '.json' = 'application/json; charset=utf-8';
-  '.jpg' = 'image/jpeg'; '.jpeg' = 'image/jpeg'; '.png' = 'image/png'; '.svg' = 'image/svg+xml'; '.webm' = 'audio/webm'; '.m4a' = 'audio/mp4'; '.mp3' = 'audio/mpeg'; '.ogg' = 'audio/ogg' }
+  '.jpg' = 'image/jpeg'; '.jpeg' = 'image/jpeg'; '.png' = 'image/png'; '.svg' = 'image/svg+xml'; '.webm' = 'audio/webm'; '.m4a' = 'audio/mp4'; '.mp3' = 'audio/mpeg'; '.ogg' = 'audio/ogg'; '.webmanifest' = 'application/manifest+json' }
 $l = New-Object Net.HttpListener
 $l.Prefixes.Add("http://localhost:$Port/")
 $l.Start()

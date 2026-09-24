@@ -3,12 +3,23 @@ import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displ
 import { relToYou } from './relate.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, toast, modal, nameOf } from './ui.js';
+import { hasBackend, post, resolveMedia } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
 
 // ---------- me ----------
 export function getMe() { try { const id = localStorage.getItem('ft.me'); return id && store.P[id] ? id : null; } catch (e) { return null; } }
 export function setMe(id) { try { id ? localStorage.setItem('ft.me', id) : localStorage.removeItem('ft.me'); } catch (e) {} window.dispatchEvent(new Event('ft:me')); }
+
+// Last person looked at — new visits pick up from here.
+export function rememberPerson(pid) { try { localStorage.setItem('ft.last', pid); } catch (e) {} }
+export function lastPerson() {
+  let id = null;
+  try { id = localStorage.getItem('ft.last'); } catch (e) {}
+  if (id && store.P[id]) return id;
+  const start = store.tree.meta?.focusId || CFG.startPerson;
+  return store.P[start] ? start : Object.keys(store.P)[0];
+}
 
 // ---------- share ----------
 export async function sharePerson(pid) {
@@ -42,6 +53,7 @@ export function datesLine(p) {
 export function openPerson(pid) {
   const p = person(pid);
   if (!p) return;
+  rememberPerson(pid);
   const me = getMe();
   const rel = me && me !== pid ? relToYou(me, pid) : null;
   const pp = parentsOf(pid);
@@ -62,6 +74,7 @@ export function openPerson(pid) {
   }).join('');
   const media = (p.media || []).map(m => {
     const cap = m.caption ? `<div class="small muted">${esc(m.caption)}</div>` : '';
+    if (m.type === 'audio' && m.src.startsWith('drive:')) return `<div><button class="btn sm" data-play="${esc(m.src)}">${icon('mic')}▶ ${esc(m.caption || t('play'))}</button></div>`;
     if (m.type === 'audio') return `<div><audio controls preload="none" src="${esc(m.src)}"></audio>${cap}</div>`;
     if (m.type === 'image') return `<div><a href="${esc(m.src)}" target="_blank" rel="noopener"><img src="${esc(m.src)}" alt="${esc(m.caption || '')}" loading="lazy"></a>${cap}</div>`;
     return `<div><a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(m.caption || m.src)}</a></div>`;
@@ -116,6 +129,12 @@ export function openPerson(pid) {
     if (a === 'edit') { close(); hooks.edit?.(pid); }
     if (a === 'me') { setMe(me === pid ? null : pid); openPerson(pid); }
     if (a === 'suggest') openSuggest(pid);
+    const play = e.target.closest('[data-play]');
+    if (play) {
+      play.disabled = true;
+      resolveMedia(play.dataset.play).then(src => { play.outerHTML = `<audio controls autoplay src="${esc(src)}"></audio>`; })
+        .catch(err => { play.disabled = false; toast(t('genericError', { msg: err.message })); });
+    }
   };
   $('[data-a="close"]', drawer).focus();
 }
@@ -126,8 +145,7 @@ export function closePerson() { const ov = $('#overlay'); ov.hidden = true; ov.i
 export function openSuggest(pid) {
   const p = pid ? person(pid) : null;
   const about = p ? `${displayName(p)}${contextLine(pid) ? ` (${contextLine(pid)})` : ''}` : t('sgGeneral');
-  const gf = CFG.googleForm || {};
-  const hasForm = !!(gf.formUrl && gf.fields?.message);
+  const hasForm = hasBackend();
   const body = html(`<form class="modal-body" style="padding:0">
     <div class="small muted">${t('sgAbout')}: <strong>${esc(about)}</strong></div>
     <fieldset><legend>${t('sgType')}</legend><div class="row">
@@ -155,12 +173,10 @@ export function openSuggest(pid) {
   const gfBtn = $('[data-gf]', m.el);
   if (gfBtn) gfBtn.onclick = async () => {
     const d = read(); if (!valid(d)) return;
-    const f = gf.fields, params = new URLSearchParams();
-    const put = (k, v) => { if (f[k]) params.append(f[k], v || ''); };
-    put('person', about); put('personId', pid || ''); put('type', d.type); put('message', d.message); put('name', d.name); put('contact', d.contact);
     gfBtn.disabled = true;
     try {
-      await fetch(gf.formUrl, { method: 'POST', mode: 'no-cors', body: params });
+      const r = await post({ action: 'suggest', person: about, personId: pid || '', type: d.type, message: d.message, name: d.name, contact: d.contact, link: pid ? `${location.origin}${location.pathname}#/person/${pid}` : location.href });
+      if (!r.ok) throw new Error(r.error);
       toast(t('sgThanks'), 4000); m.close();
     } catch (e) { toast(t('genericError', { msg: e.message })); gfBtn.disabled = false; }
   };

@@ -46,10 +46,8 @@ const STR = {
     menuEditor: 'Editor mode', menuEditorOff: 'Leave editor mode', menuSuggest: 'Suggest a change', menuAbout: 'About this site',
     themeLight: 'Light', themeDark: 'Dark',
     // editor
-    edBar: 'Editor mode', edUnsaved: '{n} unsaved change(s)', edSaved: 'All changes saved', edSaveGh: 'Save to GitHub', edDiscard: 'Discard',
-    edSaving: 'Saving…', edSavedOk: 'Saved! The public site updates in about a minute.', edTools: 'Editor tools',
-    edSetup: 'GitHub connection', edToken: 'Access token', edTokenHelp: 'A fine-grained token with “Contents: read and write” on this repo only. It is stored only in this browser.',
-    edOwner: 'Owner', edRepo: 'Repository', edBranch: 'Branch', edConnect: 'Connect', edTest: 'Test connection', edConnected: 'Connected ✓',
+    edBar: 'Editor mode', edUnsaved: '{n} unsaved change(s)', edSaved: 'All changes saved', edDiscard: 'Discard',
+    edSaving: 'Saving…', edSavedOk: 'Saved and synced — everyone sees it on their next visit.', edTools: 'Editor tools',
     edPerson: 'Edit person', edNewPerson: 'New person', given: 'First name(s)', surname: 'Surname', sex: 'Sex', isDeceased: 'Deceased',
     day: 'Day', month: 'Month', year: 'Year', birth: 'Birth', death: 'Death', photo: 'Photo', changePhoto: 'Change photo', removePhoto: 'Remove photo',
     addMedia: 'Add photo / audio', recordVoice: 'Record voice note', stopRec: 'Stop recording', caption: 'Caption', addLink: 'Add link',
@@ -59,14 +57,23 @@ const STR = {
     deletePerson: 'Delete person', confirmDelete: 'Delete {name}? Their links to relatives are removed too.',
     order: 'Birth order among siblings', marriageDate: 'Marriage date', marriagePlace: 'Marriage place',
     needsAttention: 'Needs attention', issues: 'Possible data problems', siteSettings: 'Site settings', siteTitle: 'Site title', defaultPerson: 'Default person for Family view',
-    formSetup: 'Google Form', formOk: 'Google Form is connected.', formMissing: 'Not set up yet — see README “Google Form setup”.',
     draftFound: 'You have unsaved edits from last time. Restore them?', restore: 'Restore',
-    conflict: 'Someone saved newer changes on GitHub since you started. Overwrite them with yours?',
+    conflict: 'Someone else saved newer changes since you started. Overwrite them with yours?',
     livingNote: 'Birth year of living people is not published (privacy).',
     issueDeathBeforeBirth: 'dies before being born', issueChildBeforeParent: 'born before (or too soon after) parent {name}', issueTooOld: 'parent {name} would be over 70',
     issueFuture: 'date is in the future', issueNoSex: 'sex unknown', issueIsolated: 'not linked to anyone',
     genericError: 'Something went wrong: {msg}',
     about: 'This family tree was built from the Quick Family Tree app. Suggestions are welcome — tap a person, then “Suggest a change”.',
+    // v2
+    tabExplore: 'Explore', tabSettings: 'Settings', chooseYourself: 'Choose yourself',
+    language: 'Language', theme: 'Appearance', themeSystem: 'Automatic', layout: 'Tree layout', layoutTb: 'Top-down', layoutLr: 'Sideways',
+    installTitle: 'Install the app', installBtn: 'Install', installed: 'Installed on this device ✓',
+    installIos: 'On iPhone/iPad: tap Share, then “Add to Home Screen”.', installOther: 'Use your browser menu → “Install app” or “Add to Home screen”.',
+    exports: 'Download & print', editorTitle: 'Editing', editorHelp: 'Family editors can unlock editing with the family passphrase. Changes sync to everyone.',
+    passphrase: 'Passphrase', passHelp: 'Enter the family editing passphrase.', rememberDevice: 'Remember on this device', unlock: 'Unlock',
+    wrongPass: 'Wrong passphrase.', noBackend: 'Editing isn’t switched on yet: the Google backend address is missing from config.js (see README “Backend setup”).',
+    backend: 'Sync', backendOk: 'Connected to Google Drive', backendHelp: 'Saved changes reach everyone on their next visit. A backup of every version is kept in the Drive folder.',
+    play: 'Play', edSaveGh: 'Save & sync', offline: 'You’re offline — showing the last saved copy.', updated: 'Tree updated with the latest changes.',
   },
   yo: {
     tabChart: 'Igi ìdílé', tabFocus: 'Ìdílé', tabRelate: 'Ìbátan', tabTimeline: 'Ìtàn ọdún', tabGallery: 'Àwòrán', tabStats: 'Àkópọ̀',
@@ -107,13 +114,46 @@ const STR = {
     menuEditor: 'Ipò olóòtú', menuEditorOff: 'Kúrò ní ipò olóòtú', menuSuggest: 'Dábàá àtúnṣe', menuAbout: 'Nípa ojú-òpó yìí',
     themeLight: 'Ìmọ́lẹ̀', themeDark: 'Òkùnkùn',
     about: 'A ṣe igi ìdílé yìí láti inú áàpù Quick Family Tree. A gba àbá — tẹ ẹnìkan, lẹ́yìn náà “Dábàá àtúnṣe”.',
+    tabExplore: 'Ṣàwárí', tabSettings: 'Ètò', chooseYourself: 'Yan ara rẹ',
+    language: 'Èdè', theme: 'Ìrísí', themeSystem: 'Aládàáṣe', layout: 'Ìtò igi', layoutTb: 'Láti òkè', layoutLr: 'Ní ẹ̀gbẹ́',
+    installTitle: 'Fi áàpù sórí fóònù rẹ', installBtn: 'Fi sórí ẹ̀rọ', installed: 'Ó ti wà lórí ẹ̀rọ yìí ✓',
+    installIos: 'Lórí iPhone: tẹ Share, lẹ́yìn náà “Add to Home Screen”.', installOther: 'Lo mẹ́nù aṣàwákiri rẹ → “Install app”.',
+    exports: 'Gbà sílẹ̀ / Tẹ̀ jáde', editorTitle: 'Àtúnṣe', editorHelp: 'Àwọn olóòtú ìdílé lè ṣí àtúnṣe pẹ̀lú ọ̀rọ̀ aṣínà ìdílé.',
+    passphrase: 'Ọ̀rọ̀ aṣínà', passHelp: 'Tẹ ọ̀rọ̀ aṣínà àtúnṣe ìdílé.', rememberDevice: 'Rántí lórí ẹ̀rọ yìí', unlock: 'Ṣí i',
+    wrongPass: 'Ọ̀rọ̀ aṣínà kò tọ̀nà.', play: 'Gbọ́', edSaveGh: 'Fipamọ́', offline: 'O kò sí lórí íńtánẹ́ẹ̀tì — ẹ̀dà tó kẹ́yìn nìyí.', updated: 'A ti mú igi náà dójú ìwọ̀n.',
+  },
+  // Gungbe written with Yoruba letters. DRAFT — please correct. Missing keys fall back to English.
+  gun: {
+    tabChart: 'Atin whẹndo', tabFocus: 'Whẹndo', tabRelate: 'Kọndopọ', tabExplore: 'Kpọn', tabSettings: 'Tito',
+    tabTimeline: 'Owhe lẹ', tabGallery: 'Foto lẹ', tabStats: 'Hihia',
+    searchPh: 'Din oyin de…', noResults: 'Mí ma mọ mẹde', unknown: 'Mí ma yọn',
+    childOf: 'ovi {names}', wifeOf: 'asi {name}', husbandOf: 'asu {name}', spouseOf: 'alọwlemẹ {name}',
+    bornAbbr: 'ji', diedAbbr: 'ku', deceased: 'E ko ku', born: 'Azan jiji', died: 'Azan kuku', birthday: 'Azan jiji', age: 'Owhe',
+    relToYou: '{rel} towe', thisIsMe: 'Nyẹ wẹ', notMe: 'E ma yin nyẹ', whoAreYou: 'Menu wẹ hiẹ yin?', youAre: 'Hiẹ: {name}', chooseYourself: 'De dewe',
+    meHint: 'De dewe dopo, bọ mẹlẹpo na do lehe mìwlẹ yin whẹndo do hia.',
+    parents: 'Mẹjitọ lẹ', father: 'Baba', mother: 'Iya', spouses: 'Asu / Asi', children: 'Ovi lẹ', siblings: 'Nọvi lẹ', halfSiblings: 'Nọvi (mẹjitọ dopo)',
+    grandparents: 'Tọgbo po Nọgbo po', withSpouse: 'Hẹ {name}', withUnknown: 'Mí ma yọn mẹjitọ awetọ',
+    viewInTree: 'Kpọn to atin mẹ', focusHere: 'Whẹndo etọn', details: 'Nudọnamẹ', share: 'Ma', suggest: 'Dọ ayiha towe', edit: 'Diọ',
+    relateTo: 'Nẹ mí yin whẹndo gbọn?', relTitle: 'Nẹ mí yin whẹndo gbọn?', relPickA: 'Mẹde', relPickB: 'Hẹnnumẹ', relSwap: 'Diọ',
+    relNone: 'Mí ma mọ kọndopọ depope.', relPath: 'Kọndopọ', relIs: '{b} wẹ {rel} {a} tọn', sameName: 'Mẹdopo lọ wẹ.', relPick: 'De mẹ awe nado mọ kọndopọ yetọn.',
+    close: 'Sú', cancel: 'Jo do', save: 'Hẹn do', back: 'Lẹkọ',
+    family: 'Whẹndo', lineOf: 'Whẹndo {name}', people: 'gbẹtọ', other: 'Devo lẹ', male: 'Sunnu', female: 'Yọnnu', unknownSex: 'Mí ma yọn', inLaw: 'Asi/Asu whẹndo tọn',
+    tlTitle: 'Owhe lẹ', births: 'Jiji', deaths: 'Kuku', marriages: 'Alọwle', bornEv: 'ji', diedEv: 'ku', marriedEv: 'wlealọ hẹ {name}',
+    galTitle: 'Foto whẹndo tọn', galAll: 'Mẹlẹpo', galWithPhoto: 'Mẹhe tindo foto', galNoPhoto: 'Mẹhe ma tindo foto',
+    upcoming: 'Azan jiji he ja', remembrance: 'Oflin', onThisDay: 'Igbe', today: 'igbe', tomorrow: 'izen', inDays: 'to azan {n} mẹ', yearsSince: 'owhe {n}',
+    sgTitle: 'Dọ ayiha towe', sgMsg: 'Ayiha towe', sgName: 'Oyin towe', sgContact: 'Alokan kavi imeli', sgViaForm: 'Hlan', sgViaWa: 'Hlan to WhatsApp ji',
+    sgThanks: 'Mi bayi! Mí mọ ayiha towe yí.', sgFix: 'Diọ nude', sgAdd: 'Yidogọ hẹnnumẹ', sgPhoto: 'Foto kavi hodidọ', sgOther: 'Devo',
+    language: 'Ogbè', theme: 'Nukunmẹ', layout: 'Atin', installTitle: 'Ze app do alokan towe mẹ', installBtn: 'Ze do', play: 'Sè',
+    passphrase: 'Hogbe hihọ', unlock: 'Hùn',
   },
 };
 
+export const LANGS = [['en', 'English'], ['yo', 'Yorùbá'], ['gun', 'Gungbe']];
 let current = 'en';
 try { current = localStorage.getItem('ft.lang') || 'en'; } catch (e) {}
+if (!STR[current]) current = 'en';
 export const lang = () => current;
-export function setLang(l) { current = l; try { localStorage.setItem('ft.lang', l); } catch (e) {} document.documentElement.lang = l; }
+export function setLang(l) { current = STR[l] ? l : 'en'; try { localStorage.setItem('ft.lang', current); } catch (e) {} document.documentElement.lang = current === 'gun' ? 'guw' : current; }
 export function t(key, vars) {
   let s = STR[current][key] ?? STR.en[key] ?? key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
