@@ -4,8 +4,8 @@ window.FT_CONFIG = {
   // These values are designed to be public; the passphrase is NOT here — it is the
   // password of the editor account in Firebase Authentication.
   firebase: {
-    apiKey: '',
-    projectId: '',
+    apiKey: 'AIzaSyC0gHie0hoHmUg1o3B-_CQ0t6lWPlzfsTM',
+    projectId: 'family-tree-81678',
     editorEmail: 'editor@azandowanu.family',
   },
 
