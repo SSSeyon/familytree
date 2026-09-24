@@ -1,9 +1,9 @@
-// Settings tab: me, language, appearance, layout, install, exports, editing, about.
+// Settings tab: me, language, appearance, install, exports, editing, about (version + hard refresh).
 import { store, person, displayName, search } from './data.js';
 import { t, lang, setLang, LANGS } from './i18n.js';
 import { esc, icon, avatar, $, $$, toast, attachSearch, nameOf } from './ui.js';
 import { getMe, setMe, openSuggest } from './person.js';
-import { chartState, exportPng } from './chart.js';
+import { exportPng } from './chart.js';
 import { downloadGedcom } from './export.js';
 import { isEditing, enterEditor, exitEditor } from './editor.js';
 import { searchRow } from './views.js';
@@ -14,8 +14,24 @@ export function applyTheme() {
   try { pref = localStorage.getItem('ft.theme') || 'system'; } catch (e) {}
   if (pref === 'system') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = pref;
-  const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1d1c19' : '#105e48');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark() ? '#0a3a29' : '#006343');
+}
+export function isDark() {
+  const set = document.documentElement.dataset.theme;
+  return set ? set === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+export function toggleTheme() {
+  try { localStorage.setItem('ft.theme', isDark() ? 'light' : 'dark'); } catch (e) {}
+  applyTheme();
+}
+
+// Hard refresh: drop the offline copy and cached files, then load everything fresh.
+// Personal choices (language, theme, "me") are kept.
+export async function hardRefresh() {
+  try { localStorage.removeItem('ft.cache'); } catch (e) {}
+  try { for (const r of await navigator.serviceWorker?.getRegistrations?.() || []) await r.unregister(); } catch (e) {}
+  try { for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+  location.reload();
 }
 
 // ---------- install (PWA) ----------
@@ -55,10 +71,7 @@ export function renderSettings(view, rerender) {
 
     <section class="card-box set-row">
       <h2>${t('theme')}</h2>
-      ${seg('theme', [['system', t('themeSystem')], ['light', t('themeLight')], ['dark', t('themeDark')]], themePref)}
-      <h2 style="margin-top:1rem">${t('layout')}</h2>
-      ${seg('layout', [['tb', t('layoutTb')], ['lr', t('layoutLr')]], chartState.orient)}
-    </section>
+      ${seg('theme', [['system', t('themeSystem')], ['light', t('themeLight')], ['dark', t('themeDark')]], themePref)}    </section>
 
     <section class="card-box set-row">
       <h2>${t('installTitle')}</h2>
@@ -91,15 +104,17 @@ export function renderSettings(view, rerender) {
     <section class="card-box set-row">
       <h2>${t('menuAbout')}</h2>
       <p class="small">${esc(t('about'))}</p>
-      <p class="small muted">${store.tree.meta?.updated ? 'Updated ' + esc(store.tree.meta.updated) : ''} · rev ${store.tree.meta?.rev || 0}</p>
+      <div class="version-row"><span class="version-tag">V${esc(self.APP_VERSION || '')}</span>
+        <span class="small muted">${store.tree.meta?.updated ? esc(t('dataUpdated', { date: store.tree.meta.updated })) : ''}</span>
+        <button class="btn sm" data-s="refresh">${icon('refresh')}${t('hardRefresh')}</button></div>
+      <p class="small muted">${t('hardRefreshHelp')}</p>
     </section>
   </div>`;
 
   const inp = $('[data-me]', view);
   attachSearch(inp, inp.nextElementSibling, p => { setMe(p.id); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: searchRow });
   $$('input[name=lang]', view).forEach(r => r.onchange = () => { setLang(r.value); window.dispatchEvent(new Event('ft:lang')); });
-  $$('input[name=theme]', view).forEach(r => r.onchange = () => { try { localStorage.setItem('ft.theme', r.value); } catch (e) {} applyTheme(); });
-  $$('input[name=layout]', view).forEach(r => r.onchange = () => { chartState.orient = r.value; chartState.transforms.clear(); try { localStorage.setItem('ft.orient', r.value); } catch (e) {} });
+  $$('input[name=theme]', view).forEach(r => r.onchange = () => { try { localStorage.setItem('ft.theme', r.value); } catch (e) {} applyTheme(); window.dispatchEvent(new Event('ft:theme')); });
   view.onclick = async e => {
     const a = e.target.closest('[data-s]')?.dataset.s;
     if (a === 'clear-me') setMe(null);
@@ -110,6 +125,7 @@ export function renderSettings(view, rerender) {
     if (a === 'suggest') openSuggest(null);
     if (a === 'editor') enterEditor(rerender);
     if (a === 'editor-off') exitEditor();
+    if (a === 'refresh') hardRefresh();
   };
   window.addEventListener('ft:installable', () => { const el = $('[data-install]', view); if (el) el.innerHTML = installBlock(); }, { once: true });
 }

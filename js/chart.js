@@ -1,8 +1,8 @@
 // Full descendant chart with pan/zoom, collapsible branches and branch colours.
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm';
-import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initials, founders, mainFounder, founderFor, descendants, parentsOf, spousesOf } from './data.js';
+import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initials, mainFounder, founderFor, descendants, parentsOf, spousesOf } from './data.js';
 import { t } from './i18n.js';
-import { esc, icon, html, $, download, toast } from './ui.js';
+import { esc, icon, html, $, download, toast, srcAttr } from './ui.js';
 
 const W = 168, H = 64, SG = 12, HG = 22, VG = 70;
 const PALETTE = ['--b1', '--b2', '--b3', '--b4', '--b5', '--b6', '--b7', '--b8'];
@@ -35,11 +35,10 @@ const VARS = ['--surface', '--surface-2', '--surface-3', '--line-strong', '--tex
 export const chartState = {
   root: null,
   colourBy: 'branch',
-  orient: 'tb',        // tb = top-down, lr = sideways
   collapsed: new Map(),   // root -> Set of collapsed person ids
   transforms: new Map(),  // root -> d3 zoom transform
 };
-try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; chartState.orient = localStorage.getItem('ft.orient') || (innerWidth < 760 ? 'lr' : 'tb'); } catch (e) {}
+try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; } catch (e) {}
 
 let ctx = null; // live render context
 
@@ -54,17 +53,13 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
   if (fresh) defaultCollapse(root, collapsed);
   if (focusId) expandTo(root, focusId, collapsed);
 
-  const fs = founders();
   view.innerHTML = '';
   const wrap = html(`<div class="chart-wrap">
     <div class="chart-toolbar">
-      <div class="tool-group"><label class="sr-only" for="root-sel">${t('family')}</label>
-        <select id="root-sel">${fs.map(f => `<option value="${f.id}" ${f.id === root ? 'selected' : ''}>${esc(t('lineOf', { name: displayName(P[f.id]) }))} · ${f.size}</option>`).join('')}
-        ${fs.some(f => f.id === root) ? '' : `<option value="${root}" selected>${esc(t('lineOf', { name: displayName(P[root]) }))}</option>`}</select></div>
+      ${root !== mainFounder() ? `<div class="tool-group"><button class="btn sm" data-act="home">${icon('tree')}${esc(t('lineOf', { name: displayName(P[mainFounder()]) }))}</button></div>` : ''}
       <div class="tool-group"><label class="sr-only" for="colour-sel">${t('colourBy')}</label>
         <select id="colour-sel">${['branch', 'gen', 'sex', 'none'].map(c => `<option value="${c}" ${c === chartState.colourBy ? 'selected' : ''}>${t({ branch: 'cBranch', gen: 'cGen', sex: 'cSex', none: 'cNone' }[c])}</option>`).join('')}</select></div>
       <div class="tool-group">
-        <button class="icon-btn" data-act="orient" title="${t('orient')}" aria-label="${t('orient')}">${icon(chartState.orient === 'lr' ? 'tree' : 'sideways')}</button>
         <button class="icon-btn" data-act="expand" title="${t('expandAll')}" aria-label="${t('expandAll')}">${icon('expand')}</button>
         <button class="icon-btn" data-act="collapse" title="${t('collapseAll')}" aria-label="${t('collapseAll')}">${icon('collapse')}</button>
         <button class="icon-btn" data-act="png" title="${t('exportPng')}" aria-label="${t('exportPng')}">${icon('download')}</button>
@@ -98,7 +93,6 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
   else if (saved) svg.call(zoom.transform, saved);
   else initialView();
 
-  $('#root-sel', wrap).onchange = e => onRoot(e.target.value);
   $('#colour-sel', wrap).onchange = e => { chartState.colourBy = e.target.value; try { localStorage.setItem('ft.colour', e.target.value); } catch (er) {} draw(); };
   wrap.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
@@ -110,21 +104,13 @@ export function renderChart(view, { root, focusId, onOpen, onRoot }) {
     if (act === 'expand') { collapsed.clear(); draw(); fit(); }
     if (act === 'collapse') { collapsed.clear(); defaultCollapse(ctx.root, collapsed, 2); draw(); initialView(); }
     if (act === 'png') exportPng();
-    if (act === 'orient') {
-      chartState.orient = chartState.orient === 'lr' ? 'tb' : 'lr';
-      try { localStorage.setItem('ft.orient', chartState.orient); } catch (er) {}
-      chartState.transforms.clear();
-      b.innerHTML = icon(chartState.orient === 'lr' ? 'tree' : 'sideways');
-      draw(); initialView();
-    }
+    if (act === 'home') onRoot(mainFounder());
   });
 }
 
 // ---------- layout (contour packing: subtrees slide together as far as their outlines allow) ----------
-// "b" = breadth axis (x when top-down, y when sideways); depth is the other axis.
-const dims = () => chartState.orient === 'lr'
-  ? { B: H, SGB: 10, GAP: 14, STEP: W + 64 }
-  : { B: W, SGB: SG, GAP: HG, STEP: H + VG };
+// "b" = breadth axis (x), depth = y.
+const dims = () => ({ B: W, SGB: SG, GAP: HG, STEP: H + VG });
 
 function build(pid, depth, seen, collapsed) {
   const dup = seen.has(pid);
@@ -173,10 +159,9 @@ function layoutKids(node) {
 
 function place(node, b, d, out) {
   const { B, SGB, STEP } = dims();
-  const lr = chartState.orient === 'lr';
-  node.px = lr ? d : b; node.py = lr ? b : d;
-  node.spouses.forEach((s, i) => { const sb = b + (i + 1) * (B + SGB); s.x = lr ? d : sb; s.y = lr ? sb : d; });
-  node.bw = lr ? W : node.blockB; node.bh = lr ? node.blockB : H;
+  node.px = b; node.py = d;
+  node.spouses.forEach((s, i) => { s.x = b + (i + 1) * (B + SGB); s.y = d; });
+  node.bw = node.blockB; node.bh = H;
   out.push(node);
   for (const g of node.groups) for (const k of g.kids) place(k, b + k.offset, d + STEP, out);
 }
@@ -222,18 +207,15 @@ function colourFor(pid, depth, isSpouse, bi) {
   return i < PALETTE.length ? `var(${PALETTE[i]})` : 'var(--b-other)';
 }
 
-function drawLegend(bi, maxDepth) {
+// Key box for sex / generation colouring. Branch colouring has no key box.
+function drawLegend(maxDepth) {
   const el = $('#legend', ctx.wrap);
   const by = chartState.colourBy;
   let items = [];
-  if (by === 'branch') {
-    items = bi.heads.slice(0, PALETTE.length).map((h, i) => [`var(${PALETTE[i]})`, displayName(person(h))]);
-    if (bi.heads.length > PALETTE.length) items.push(['var(--b-other)', t('other')]);
-    items.push(['var(--b-other)', t('inLaw')]);
-  } else if (by === 'sex') items = [['var(--b1)', t('male')], ['var(--b2)', t('female')], ['var(--b-other)', t('unknownSex')]];
+  if (by === 'sex') items = [['var(--b1)', t('male')], ['var(--b2)', t('female')], ['var(--b-other)', t('unknownSex')]];
   else if (by === 'gen') items = GENS.slice(0, Math.min(maxDepth + 1, GENS.length)).map((g, i) => [`var(${g})`, t('generation', { n: i + 1 }) + (i === GENS.length - 1 ? '+' : '')]);
   el.hidden = !items.length;
-  el.innerHTML = `<strong>${by === 'branch' ? t('branches') : t('colourBy')}</strong><ul>${items.map(([c, l]) => `<li><i style="background:${c}"></i>${esc(l)}</li>`).join('')}</ul>`;
+  el.innerHTML = `<strong>${t('colourBy')}</strong><ul>${items.map(([c, l]) => `<li><i style="background:${c}"></i>${esc(l)}</li>`).join('')}</ul>`;
 }
 
 // ---------- drawing ----------
@@ -243,36 +225,25 @@ function draw() {
   ctx.layout = nodes;
   const bi = branchInfo(root);
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0);
-  drawLegend(bi, maxDepth);
+  drawLegend(maxDepth);
   const hl = ctx.highlight;
 
   let links = '', cards = '';
   const hasParents = pid => !!person(pid)?.parents;
-  const lr = chartState.orient === 'lr';
   for (const n of nodes) {
     // marriage lines
     n.spouses.forEach(s => {
-      links += lr
-        ? `<line class="mline" x1="${n.px + 26}" y1="${n.py + H}" x2="${s.x + 26}" y2="${s.y}"/>`
-        : `<line class="mline" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
+      links += `<line class="mline" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
     });
     // child connectors
     for (const g of n.groups) {
-      if (lr) {
-        const oy = g.si < 0 ? n.py + H / 2 : g.si === 0 ? n.py + H + 5 : n.spouses[g.si].y + H / 2;
-        const ox = g.si > 0 ? n.spouses[g.si].x + W : n.px + W;
-        const busX = n.px + W + 32;
-        const ys = g.kids.map(k => k.py + H / 2);
-        links += `<path class="link" d="M${ox},${oy}H${busX}M${busX},${Math.min(oy, ...ys)}V${Math.max(oy, ...ys)}${ys.map(y => `M${busX},${y}H${busX + 32}`).join('')}"/>`;
-      } else {
-        const ox = g.si < 0 ? n.px + W / 2 : g.si === 0 ? n.px + W + SG / 2 : n.spouses[g.si].x + W / 2;
-        const oy = g.si === 0 ? n.py + H / 2 : n.py + H;
-        const busY = n.py + H + VG / 2;
-        const xs = g.kids.map(k => k.px + W / 2);
-        links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${busY + VG / 2}`).join('')}"/>`;
-      }
+      const ox = g.si < 0 ? n.px + W / 2 : g.si === 0 ? n.px + W + SG / 2 : n.spouses[g.si].x + W / 2;
+      const oy = g.si === 0 ? n.py + H / 2 : n.py + H;
+      const busY = n.py + H + VG / 2;
+      const xs = g.kids.map(k => k.px + W / 2);
+      links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${busY + VG / 2}`).join('')}"/>`;
     }
-    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, lr, toggle: n.hasKids ? (n.collapsed ? '+' + n.kidCount : '−') : null });
+    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids ? (n.collapsed ? '+' + n.kidCount : '−') : null });
     n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: hasParents(s.pid) && !descendants(root).has(s.pid) }); });
   }
   scene.html(`<g class="links">${links}</g><g class="cards">${cards}</g>`);
@@ -292,7 +263,7 @@ function draw() {
   });
 }
 
-function card(pid, x, y, { depth, dup, spouse, bi, hl, lr, toggle, badge }) {
+function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
   const p = person(pid) || {};
   const name = displayName(p);
   const nm = name.length > 17 ? name.slice(0, 16) + '…' : name;
@@ -300,7 +271,7 @@ function card(pid, x, y, { depth, dup, spouse, bi, hl, lr, toggle, badge }) {
   const subT = sub.length > 24 ? sub.slice(0, 23) + '…' : sub;
   const col = colourFor(pid, depth, spouse, bi);
   const photo = p.photo
-    ? `<circle class="phbg" cx="34" cy="32" r="22"/><image href="${esc(p.photo)}" x="12" y="10" width="44" height="44" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
+    ? `<circle class="phbg" cx="34" cy="32" r="22"/><image ${srcAttr(p.photo, 'href')} x="12" y="10" width="44" height="44" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
     : `<circle class="phbg" cx="34" cy="32" r="22"/><text class="ini" x="34" y="37" text-anchor="middle">${esc(initials(p))}</text>`;
   return `<g class="node${dup ? ' dup' : ''}${hl === pid ? ' hl' : ''}" data-pid="${esc(pid)}" transform="translate(${x},${y})">
     <title>${esc(name)}${p.nickname ? ` (${esc(p.nickname)})` : ''}</title>
@@ -309,7 +280,7 @@ function card(pid, x, y, { depth, dup, spouse, bi, hl, lr, toggle, badge }) {
     ${photo}
     <text class="nm" x="64" y="${sub ? 28 : 37}">${esc(nm)}</text>
     ${sub ? `<text class="sub" x="64" y="45">${esc(subT)}</text>` : ''}
-    ${toggle ? `<g class="tog" transform="translate(${lr ? W : W / 2},${lr ? H / 2 : H})"><circle r="${toggle.length > 1 ? 13 : 10}"/><text y="4" text-anchor="middle">${toggle}</text></g>` : ''}
+    ${toggle ? `<g class="tog" transform="translate(${W / 2},${H})"><circle r="${toggle.length > 1 ? 13 : 10}"/><text y="4" text-anchor="middle">${toggle}</text></g>` : ''}
     ${badge ? `<g class="badge" transform="translate(${W - 34},-9)"><title>${esc(t('showFamily'))}</title><rect width="28" height="18" rx="9"/><text x="14" y="13" text-anchor="middle">↑</text></g>` : ''}
   </g>`;
 }
@@ -337,9 +308,7 @@ function initialView() {
   const pos = nodePos(ctx.root) || { x: 0, y: 0 };
   const { w, h } = viewport();
   const k = 0.85;
-  const tr = chartState.orient === 'lr'
-    ? d3.zoomIdentity.translate(24, h / 2 - (pos.y + H / 2) * k).scale(k)
-    : d3.zoomIdentity.translate(w / 2 - (pos.x + W / 2) * k, 90).scale(k);
+  const tr = d3.zoomIdentity.translate(w / 2 - (pos.x + W / 2) * k, 90).scale(k);
   ctx.svg.call(ctx.zoom.transform, tr);
 }
 

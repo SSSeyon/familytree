@@ -25,23 +25,25 @@ export function relation(a, b) {
   if (spousesOf(a).includes(b)) return { k: 'spouse' };
   const r = blood(a, b);
   if (r) return { k: 'blood', ...r };
-  // step / in-law via A's spouse
+  // step / in-law via A's spouse (link = that spouse, used to draw the path)
   for (const s of spousesOf(a)) {
     const r2 = blood(s, b);
     if (!r2) continue;
-    if (r2.up === 0 && r2.down === 1) return { k: 'stepchild' };
-    if (r2.down === 0) return { k: 'parentInLaw', gen: r2.up };
-    if (r2.up === 1 && r2.down === 1) return { k: 'siblingInLaw' };
-    return { k: 'viaSpouse', spouse: s, inner: { k: 'blood', ...r2 } };
+    const via = { link: s, side: 'a', inner: { k: 'blood', ...r2 } };
+    if (r2.up === 0 && r2.down === 1) return { k: 'stepchild', ...via };
+    if (r2.down === 0) return { k: 'parentInLaw', gen: r2.up, ...via };
+    if (r2.up === 1 && r2.down === 1) return { k: 'siblingInLaw', ...via };
+    return { k: 'viaSpouse', spouse: s, ...via };
   }
   // in-law via B's spouse
   for (const s of spousesOf(b)) {
     const r2 = blood(a, s);
     if (!r2) continue;
-    if (r2.up === 0) return { k: 'childInLaw', gen: r2.down };
-    if (r2.up === 1 && r2.down === 0) return { k: 'stepparent' };
-    if (r2.up === 1 && r2.down === 1) return { k: 'siblingInLaw' };
-    return { k: 'spouseOfRel', spouse: s, inner: { k: 'blood', ...r2 } };
+    const via = { link: s, side: 'b', inner: { k: 'blood', ...r2 } };
+    if (r2.up === 0) return { k: 'childInLaw', gen: r2.down, ...via };
+    if (r2.up === 1 && r2.down === 0) return { k: 'stepparent', ...via };
+    if (r2.up === 1 && r2.down === 1) return { k: 'siblingInLaw', ...via };
+    return { k: 'spouseOfRel', spouse: s, ...via };
   }
   return shortestPath(a, b) ? { k: 'distant' } : null;
 }
@@ -64,6 +66,39 @@ export function shortestPath(a, b) {
   const steps = [];
   for (let cur = b; cur !== a; cur = prev.get(cur).from) steps.unshift({ id: cur, edge: prev.get(cur).edge });
   return [{ id: a }, ...steps];
+}
+
+// The chain of people that explains relation(a, b): up to the common ancestor and back
+// down, plus the marriage for in-laws. Falls back to the shortest chain.
+export function relationPath(a, b) {
+  const r = relation(a, b);
+  if (r?.k === 'blood') return bloodPath(a, b, r.via);
+  if (r?.link) {
+    const inner = r.side === 'a' ? bloodPath(r.link, b, r.inner.via) : bloodPath(a, r.link, r.inner.via);
+    if (inner) return r.side === 'a'
+      ? [{ id: a }, { id: r.link, edge: 'eSpouse' }, ...inner.slice(1)]
+      : [...inner, { id: b, edge: 'eSpouse' }];
+  }
+  return shortestPath(a, b);
+}
+function bloodPath(a, b, via) {
+  const up = chainUp(a, via), down = chainUp(b, via);
+  if (!up || !down) return null;
+  return [{ id: a }, ...up.slice(1).map(id => ({ id, edge: 'eParent' })), ...down.reverse().slice(1).map(id => ({ id, edge: 'eChild' }))];
+}
+// [from, parent, grandparent, …, ancestor] along the shortest line of parents.
+function chainUp(from, ancestor) {
+  const prev = new Map([[from, null]]);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift();
+    if (cur === ancestor) break;
+    for (const p of parentIds(cur)) if (!prev.has(p)) { prev.set(p, cur); q.push(p); }
+  }
+  if (!prev.has(ancestor)) return null;
+  const out = [];
+  for (let c = ancestor; c != null; c = prev.get(c)) out.unshift(c);
+  return out;
 }
 
 // ---------- wording ----------

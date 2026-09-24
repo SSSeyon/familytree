@@ -9,7 +9,7 @@ export function html(str) { const tpl = document.createElement('template'); tpl.
 
 const I = {
   tree: '<path d="M12 3v6M12 9H6v4M12 9h6v4M6 13v2M18 13v2"/><rect x="9" y="1.5" width="6" height="4" rx="1"/><rect x="3" y="15" width="6" height="5" rx="1"/><rect x="15" y="15" width="6" height="5" rx="1"/>',
-  sideways: '<rect x="1.5" y="9.5" width="5" height="5" rx="1"/><path d="M6.5 12H10M10 6v12M10 6h3M10 18h3"/><rect x="13" y="3.5" width="8" height="5" rx="1"/><rect x="13" y="15.5" width="8" height="5" rx="1"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/>',
@@ -39,13 +39,20 @@ const I = {
   whatsapp: '<path d="M3.5 20.5 5 16a8.5 8.5 0 1 1 3.2 3.1Z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.5-2-1-1 1c-1-.5-2.5-2-3-3l1-1-1-2L9 8.5Z"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
-  github: '<path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.7 11.7 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
 };
 export const icon = (name, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${I[name] || ''}</svg>`;
 
+// Photos and voice notes uploaded in the editor live in Firestore as "fs:<id>"; the app
+// fills them in after render (see hydrateMedia in app.js). Everything else is a plain URL.
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+export const srcAttr = (src, attr = 'src', placeholder = BLANK) => src?.startsWith('fs:')
+  ? `${attr}="${placeholder}" data-fs="${esc(src)}" data-fs-attr="${attr}"`
+  : `${attr}="${esc(src)}"`;
+
 export function avatar(p, cls = '') {
-  if (p?.photo) return `<div class="ph ${cls}"><img src="${esc(p.photo)}" alt="" loading="lazy"></div>`;
+  if (p?.photo) return `<div class="ph ${cls}"><img ${srcAttr(p.photo)} alt="" loading="lazy"></div>`;
   return `<div class="ph ${cls}" aria-hidden="true">${esc(initials(p))}</div>`;
 }
 

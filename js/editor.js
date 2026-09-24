@@ -1,10 +1,10 @@
-// Built-in editor: edit people & links, upload photos/voice notes, save to the backend.
+// Built-in editor: edit people & links, upload photos/voice notes, save to Firebase.
 import { store, person, union, parentsOf, unionsOf, spouseIn, kidsOf, displayName, isLiving, newId, changed, setTree, search, contextLine, allPeople, isNamed, childrenOf, parentIds, cacheTree } from './data.js';
 import { t } from './i18n.js';
-import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch, download, nameOf } from './ui.js';
+import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch, download, nameOf, srcAttr } from './ui.js';
 import { getMe, setMe, closePerson } from './person.js';
 import { searchRow } from './views.js';
-import { hasBackend, fetchRemoteTree, post } from './backend.js';
+import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
 const ED = { on: false, dirty: 0, baseRev: 0, uploads: new Map() };
@@ -12,15 +12,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export const isEditing = () => ED.on;
 
-// ---------- passphrase & draft ----------
-function getPass() { try { return sessionStorage.getItem('ft.pass') || localStorage.getItem('ft.pass') || ''; } catch (e) { return ''; } }
-function setPass(p, remember) {
-  try {
-    sessionStorage.removeItem('ft.pass'); localStorage.removeItem('ft.pass');
-    if (p) (remember ? localStorage : sessionStorage).setItem('ft.pass', p);
-  } catch (e) {}
-}
-
+// ---------- draft ----------
 function saveDraft() {
   try {
     const uploads = [...ED.uploads].filter(([, u]) => u.dataUrl.length < 1.5e6).map(([path, u]) => ({ path, dataUrl: u.dataUrl }));
@@ -37,17 +29,16 @@ export async function enterEditor(rerender) {
     modal({ title: t('menuEditor'), body: `<p>${esc(t('noBackend'))}</p>` });
     return;
   }
-  if (!getPass()) { openUnlock(() => enterEditor(rerender)); return; }
+  if (!isSignedIn()) { openUnlock(() => enterEditor(rerender)); return; }
   try {
-    const r = await post({ action: 'verify', pass: getPass() });
-    if (!r.ok) {
-      if (r.error === 'wrong-passphrase') { setPass(''); toast(t('wrongPass'), 4000); openUnlock(() => enterEditor(rerender)); return; }
-      throw new Error(r.error);
-    }
+    await checkSignIn();
     // start from the freshest copy
     const remote = await fetchRemoteTree();
     if (remote && (remote.meta?.rev || 0) >= (store.tree.meta?.rev || 0)) { setTree(remote); cacheTree(); }
-  } catch (e) { toast(t('genericError', { msg: e.message }), 5000); return; }
+  } catch (e) {
+    if (e.message === 'signed-out') { openUnlock(() => enterEditor(rerender)); return; }
+    toast(t('genericError', { msg: e.message }), 5000); return;
+  }
   ED.on = true;
   ED.baseRev = store.tree.meta?.rev || 0;
   try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
@@ -62,12 +53,12 @@ export async function enterEditor(rerender) {
 export function exitEditor() {
   if (ED.dirty && !confirm(t('edUnsaved', { n: ED.dirty }) + ' — ' + t('edDiscard') + '?')) return;
   try { localStorage.removeItem('ft.editing'); } catch (e) {}
-  setPass('');
+  signOut();
   if (ED.dirty) { clearDraft(); location.reload(); return; }
   ED.on = false;
   updateBar(); changed();
 }
-export const wantsEditor = () => { try { return localStorage.getItem('ft.editing') === '1' && !!getPass(); } catch (e) { return false; } };
+export const wantsEditor = () => { try { return localStorage.getItem('ft.editing') === '1' && isSignedIn(); } catch (e) { return false; } };
 
 function commit() { ED.dirty++; saveDraft(); updateBar(); changed(); }
 
@@ -104,16 +95,9 @@ async function saveAll() {
   const btn = $('[data-e="save"]', $('#edit-bar'));
   if (btn) { btn.disabled = true; btn.textContent = t('edSaving'); }
   try {
-    const pass = getPass();
-    // 1. uploads (photos, voice notes) → Google Drive
+    // 1. uploads (photos, voice notes) → Firestore "media"
     const done = new Map();
-    for (const [path, u] of ED.uploads) {
-      const [meta, data] = u.dataUrl.split(',');
-      const mime = meta.slice(5).split(';')[0];
-      const r = await post({ action: 'upload', pass, name: path.split('/').pop(), mime, data });
-      if (!r.ok) throw new Error(r.error);
-      done.set(u.dataUrl, r.url);
-    }
+    for (const [, u] of ED.uploads) done.set(u.dataUrl, await uploadMedia(u.dataUrl));
     for (const p of Object.values(store.P)) {
       if (done.has(p.photo)) p.photo = done.get(p.photo);
       (p.media || []).forEach(m => { if (done.has(m.src)) m.src = done.get(m.src); });
@@ -121,19 +105,20 @@ async function saveAll() {
     ED.uploads.clear();
     // 2. the tree itself
     const clean = sanitized(store.tree);
-    let r = await post({ action: 'save', pass, tree: clean, baseRev: ED.baseRev });
-    if (!r.ok && r.error === 'conflict') {
+    let r = await saveTree(clean, ED.baseRev);
+    if (r.conflict) {
       if (!(await confirmBox(t('conflict'), t('save')))) throw new Error('cancelled');
-      r = await post({ action: 'save', pass, tree: clean, baseRev: ED.baseRev, force: true });
+      r = await saveTree(clean, ED.baseRev, true);
     }
-    if (!r.ok) throw new Error(r.error === 'wrong-passphrase' ? t('wrongPass') : r.error);
-    clean.meta = { ...(clean.meta || {}), rev: r.rev, updated: new Date().toISOString().slice(0, 10) };
+    clean.meta = { ...(clean.meta || {}), rev: r.rev, updated: r.updated };
     setTree(clean); cacheTree();
     ED.baseRev = r.rev; ED.dirty = 0; clearDraft();
     toast(t('edSavedOk'), 4000);
   } catch (e) {
-    if (e.message !== 'cancelled') toast(t('genericError', { msg: e.message }), 6000);
+    const out = e.message === 'signed-out' || e.message === 'not-allowed';
+    if (e.message !== 'cancelled') toast(out ? t('signedOut') : t('genericError', { msg: e.message }), 6000);
     saveDraft();
+    if (out) { signOut(); openUnlock(() => {}); }
   }
   updateBar(); changed();
 }
@@ -146,15 +131,25 @@ export function openUnlock(after) {
     <label class="row small"><input type="checkbox" name="remember"> ${t('rememberDevice')}</label>
   </form>`);
   const m = modal({ title: t('menuEditor'), body, foot: `<button class="btn" data-close>${t('cancel')}</button><button class="btn primary" data-go>${icon('lock')}${t('unlock')}</button>` });
-  const go = () => {
+  const goBtn = $('[data-go]', m.el);
+  const go = async () => {
     const d = new FormData(body);
     if (!d.get('pass')) return;
-    setPass(d.get('pass'), !!d.get('remember'));
+    goBtn.disabled = true;
+    try {
+      await signIn(d.get('pass'), !!d.get('remember'));
+    } catch (e) {
+      goBtn.disabled = false;
+      toast(e.message === 'wrong-passphrase' ? t('wrongPass') : e.message === 'too-many' ? t('tooMany') : t('genericError', { msg: e.message }), 4000);
+      body.pass.select();
+      return;
+    }
     try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
     m.close(); after?.();
   };
-  $('[data-go]', m.el).onclick = go;
+  goBtn.onclick = go;
   body.onsubmit = e => { e.preventDefault(); go(); };
+  setTimeout(() => body.pass.focus(), 50);
 }
 
 // ---------- mutations ----------
@@ -322,7 +317,7 @@ export function editPerson(pid) {
 
   const drawMedia = () => {
     $('[data-media]', body).innerHTML = media.map((x, i) => `<div class="row small" style="margin-bottom:.4rem">
-      ${x.type === 'audio' ? `<audio controls src="${esc(x.src)}" style="max-width:220px"></audio>` : x.type === 'image' ? `<img src="${esc(x.src)}" alt="" style="height:48px;border-radius:6px">` : `<a href="${esc(x.src)}" target="_blank" rel="noopener">${esc(x.src.slice(0, 40))}</a>`}
+      ${x.type === 'audio' ? `<audio controls ${srcAttr(x.src)} style="max-width:220px"></audio>` : x.type === 'image' ? `<img ${srcAttr(x.src)} alt="" style="height:48px;border-radius:6px">` : `<a href="${esc(x.src)}" target="_blank" rel="noopener">${esc(x.src.slice(0, 40))}</a>`}
       <input type="text" data-cap="${i}" value="${esc(x.caption || '')}" placeholder="${t('caption')}" style="flex:1;min-width:120px">
       <button type="button" class="icon-btn" data-mrm="${i}" aria-label="${t('delete')}">${icon('trash')}</button></div>`).join('');
   };
@@ -472,6 +467,7 @@ export function renderEditorPage(view, rerender) {
         <p class="small muted">${t('backendHelp')}</p>
       </section>
     </div>
+    <section class="card-box" style="margin-top:1rem"><h2>${t('suggestions')}</h2><div data-sugg class="small muted">…</div></section>
     <section class="card-box" style="margin-top:1rem"><h2>${t('needsAttention')}</h2>
       <h3>${t('issues')} (${issues.length})</h3>
       <ul class="list-plain">${issues.map(i => `<li>${avatar(person(i.pid), 'sm')}<a href="#/person/${esc(i.pid)}">${nameOf(person(i.pid))}</a><span class="muted small">${esc(i.msg)}</span><span class="right"><button class="btn sm" data-edit="${esc(i.pid)}">${t('edit')}</button></span></li>`).join('') || '<li class="muted">✓</li>'}</ul>
@@ -483,4 +479,26 @@ export function renderEditorPage(view, rerender) {
   $$('[data-edit]', view).forEach(b => b.onclick = () => editPerson(b.dataset.edit));
   const fs = $('[data-focus-search]', view);
   attachSearch(fs, fs.nextElementSibling, p => { meta.focusId = p.id; commit(); }, { searchFn: q => search(q), render: searchRow });
+  loadSuggestions($('[data-sugg]', view));
+}
+
+// Messages sent with "Suggest a change" (read-only for everyone but editors).
+async function loadSuggestions(box) {
+  try {
+    const list = await listSuggestions();
+    if (!list.length) { box.textContent = t('noSuggestions'); return; }
+    box.classList.remove('muted');
+    box.innerHTML = list.map(s => `<div class="sugg">
+      <div><strong>${esc(s.person || '')}</strong> · <span class="muted">${esc(s.type || '')} · ${esc((s.created || '').slice(0, 10))}</span></div>
+      <div style="white-space:pre-wrap">${esc(s.message || '')}</div>
+      <div class="muted">${esc([s.name, s.contact].filter(Boolean).join(' · '))}</div>
+      <div class="row">${s.personId && person(s.personId) ? `<button class="btn sm" data-edit="${esc(s.personId)}">${t('edit')}</button>` : ''}<button class="btn sm ghost" data-done="${esc(s.id)}">${icon('check')}${t('sgDone')}</button></div>
+    </div>`).join('');
+    $$('[data-edit]', box).forEach(b => b.onclick = () => editPerson(b.dataset.edit));
+    $$('[data-done]', box).forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { await deleteSuggestion(b.dataset.done); b.closest('.sugg').remove(); if (!box.children.length) box.textContent = t('noSuggestions'); }
+      catch (e) { b.disabled = false; toast(t('genericError', { msg: e.message })); }
+    });
+  } catch (e) { box.textContent = t('genericError', { msg: e.message }); }
 }

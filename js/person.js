@@ -2,8 +2,8 @@
 import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, isLiving, fmtDate, contextLine } from './data.js';
 import { relToYou } from './relate.js';
 import { t } from './i18n.js';
-import { esc, icon, avatar, html, $, toast, modal, nameOf } from './ui.js';
-import { hasBackend, post, resolveMedia } from './backend.js';
+import { esc, icon, avatar, html, $, toast, modal, nameOf, srcAttr } from './ui.js';
+import { hasBackend, sendSuggestion, resolveMedia } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
 
@@ -74,8 +74,9 @@ export function openPerson(pid) {
   }).join('');
   const media = (p.media || []).map(m => {
     const cap = m.caption ? `<div class="small muted">${esc(m.caption)}</div>` : '';
-    if (m.type === 'audio' && m.src.startsWith('drive:')) return `<div><button class="btn sm" data-play="${esc(m.src)}">${icon('mic')}▶ ${esc(m.caption || t('play'))}</button></div>`;
+    if (m.type === 'audio' && m.src.startsWith('fs:')) return `<div><button class="btn sm" data-play="${esc(m.src)}">${icon('mic')}▶ ${esc(m.caption || t('play'))}</button></div>`;
     if (m.type === 'audio') return `<div><audio controls preload="none" src="${esc(m.src)}"></audio>${cap}</div>`;
+    if (m.type === 'image' && m.src.startsWith('fs:')) return `<div><img ${srcAttr(m.src)} alt="${esc(m.caption || '')}" loading="lazy">${cap}</div>`;
     if (m.type === 'image') return `<div><a href="${esc(m.src)}" target="_blank" rel="noopener"><img src="${esc(m.src)}" alt="${esc(m.caption || '')}" loading="lazy"></a>${cap}</div>`;
     return `<div><a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(m.caption || m.src)}</a></div>`;
   }).join('');
@@ -175,8 +176,7 @@ export function openSuggest(pid) {
     const d = read(); if (!valid(d)) return;
     gfBtn.disabled = true;
     try {
-      const r = await post({ action: 'suggest', person: about, personId: pid || '', type: d.type, message: d.message, name: d.name, contact: d.contact, link: pid ? `${location.origin}${location.pathname}#/person/${pid}` : location.href });
-      if (!r.ok) throw new Error(r.error);
+      await sendSuggestion({ person: about, personId: pid || '', type: d.type, message: d.message, name: d.name, contact: d.contact, link: pid ? `${location.origin}${location.pathname}#/person/${pid}` : location.href });
       toast(t('sgThanks'), 4000); m.close();
     } catch (e) { toast(t('genericError', { msg: e.message })); gfBtn.disabled = false; }
   };

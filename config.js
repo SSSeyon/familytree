@@ -1,8 +1,13 @@
 // Site settings. Everything here is public (it ships with the website).
 window.FT_CONFIG = {
-  // Google Apps Script web-app URL (see README "Backend setup").
-  // It stores the tree, checks the editor passphrase and receives suggestions.
-  backend: { url: '' },
+  // Firebase project used to sync edits (see README "Editing & sync setup").
+  // These values are designed to be public; the passphrase is NOT here — it is the
+  // password of the editor account in Firebase Authentication.
+  firebase: {
+    apiKey: '',
+    projectId: '',
+    editorEmail: 'editor@azandowanu.family',
+  },
 
   // "Suggest a change" → WhatsApp (international format, no + or leading 0).
   whatsapp: '2348080825007',

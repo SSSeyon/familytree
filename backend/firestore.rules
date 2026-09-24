@@ -1,0 +1,36 @@
+rules_version = '2';
+// Paste into Firebase console → Firestore Database → Rules → Publish.
+// Change the email below if you used a different one for the editor account.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isEditor() {
+      return request.auth != null && request.auth.token.email == 'editor@azandowanu.family';
+    }
+
+    // The family tree: everyone can read, only the editor can change it.
+    match /site/{doc} {
+      allow read: if true;
+      allow write: if isEditor();
+    }
+
+    // Uploaded photos and voice notes.
+    match /media/{id} {
+      allow read: if true;
+      allow write: if isEditor();
+    }
+
+    // Backup of every earlier version.
+    match /history/{id} {
+      allow read, write: if isEditor();
+    }
+
+    // "Suggest a change": anyone can send one; only the editor can read or clear them.
+    match /suggestions/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['person', 'personId', 'type', 'message', 'name', 'contact', 'link', 'created'])
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 3000;
+      allow read, delete: if isEditor();
+    }
+  }
+}

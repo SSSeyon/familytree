@@ -1,7 +1,9 @@
-// Service worker: offline app shell + cached photos. Bump VERSION when shipping changes.
-const VERSION = 'ft-v2';
+// Service worker: offline app shell + cached photos. The cache name follows APP_VERSION
+// in version.js, so bumping the version ships the update to everyone.
+importScripts('version.js');
+const VERSION = 'ft-' + self.APP_VERSION;
 const SHELL = [
-  './', 'index.html', 'config.js', 'manifest.webmanifest', 'css/app.css',
+  './', 'index.html', 'version.js', 'config.js', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/data.js', 'js/i18n.js', 'js/ui.js', 'js/chart.js', 'js/views.js', 'js/person.js',
   'js/relate.js', 'js/editor.js', 'js/export.js', 'js/settings.js', 'js/backend.js',
   'data/tree.json', 'icons/icon-192.png', 'icons/favicon-64.png',
@@ -18,10 +20,12 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // live data from the Google backend is never cached here (the app keeps its own copy)
-  if (url.hostname.endsWith('script.google.com') || url.hostname.endsWith('script.googleusercontent.com')) return;
+  // uploaded photos / voice notes never change once saved, so keep them
+  if (url.hostname === 'firestore.googleapis.com' && url.pathname.includes('/documents/media/')) return e.respondWith(cacheFirst(req));
+  // other live data (the tree, sign-in) always goes to the network; the app keeps its own copy
+  if (url.hostname.endsWith('googleapis.com')) return;
   const sameOrigin = url.origin === location.origin;
-  const isPhoto = /\/(photos|icons)\//.test(url.pathname) || url.hostname === 'lh3.googleusercontent.com';
+  const isPhoto = /\/(photos|icons)\//.test(url.pathname);
   const isCdn = /cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com/.test(url.hostname);
   if (isPhoto || isCdn) e.respondWith(cacheFirst(req));
   else if (sameOrigin) e.respondWith(networkFirst(req));

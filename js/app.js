@@ -6,7 +6,8 @@ import { renderChart } from './chart.js';
 import { renderFocus, renderRelate, renderExplore, searchRow } from './views.js';
 import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPerson } from './person.js';
 import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
-import { renderSettings, applyTheme } from './settings.js';
+import { renderSettings, applyTheme, isDark, toggleTheme } from './settings.js';
+import { resolveMedia } from './backend.js';
 
 const view = $('#view');
 const TABS = [
@@ -72,7 +73,25 @@ function drawShell() {
     : `${icon('user')}<span class="me-name">${t('chooseYourself')}</span>`;
   $('#me-btn').title = me ? t('youAre', { name: displayName(person(me)) }) : t('chooseYourself');
   $('#me-btn').classList.toggle('on', !!me);
+  drawThemeBtn();
   if (current.name) show(current.name);
+}
+
+// Sun in dark mode, moon in light mode: tap to switch.
+function drawThemeBtn() {
+  const b = $('#theme-btn');
+  b.innerHTML = icon(isDark() ? 'sun' : 'moon');
+  b.title = t(isDark() ? 'themeLight' : 'themeDark');
+  b.setAttribute('aria-label', b.title);
+}
+
+// Uploaded photos / voice notes ("fs:<id>", see srcAttr in ui.js) are fetched after render.
+function hydrateMedia(root) {
+  root.querySelectorAll?.('[data-fs]').forEach(el => {
+    const src = el.dataset.fs, attr = el.dataset.fsAttr || 'src';
+    el.removeAttribute('data-fs');
+    resolveMedia(src).then(url => el.setAttribute(attr, url)).catch(() => {});
+  });
 }
 
 function wire() {
@@ -88,7 +107,10 @@ function wire() {
   window.addEventListener('hashchange', route);
   window.addEventListener('ft:me', () => { drawShell(); if (current.name !== 'chart') route(); });
   window.addEventListener('ft:lang', () => { drawShell(); updateBar(); route(); });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyTheme(); drawThemeBtn(); });
+  $('#theme-btn').onclick = () => { toggleTheme(); drawThemeBtn(); if (current.name === 'settings') route(); };
+  window.addEventListener('ft:theme', drawThemeBtn);
+  new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(n => n.nodeType === 1 && hydrateMedia(n.parentNode || n)))).observe(document.body, { childList: true, subtree: true });
   onChange(() => { drawShell(); route(); });
   setPersonHooks({ isEditing, edit: editPerson });
 }

@@ -1,10 +1,10 @@
 // Family (focus) view, relationship finder, timeline, gallery and stats.
 import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, lifeSpan, isLiving, fmtDate, search, contextLine, allPeople, founders, mainFounder, isNamed, descendants, childrenOf } from './data.js';
-import { relSentence, relWord, relToYou, shortestPath } from './relate.js';
+import { relSentence, relWord, relToYou, relationPath } from './relate.js';
 import { branchColour } from './chart.js';
 import { getMe, openSuggest, datesLine, rememberPerson } from './person.js';
 import { t } from './i18n.js';
-import { esc, icon, avatar, html, $, $$, attachSearch, nameOf } from './ui.js';
+import { esc, icon, avatar, html, $, $$, attachSearch, nameOf, srcAttr } from './ui.js';
 
 const searchRow = p => `${avatar(p, 'sm')}<span><div>${nameOf(p)}${p.nickname ? ` <span class="muted small">“${esc(p.nickname)}”</span>` : ''}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>`;
 
@@ -70,13 +70,11 @@ export function renderRelate(view, a, b) {
     : `<div class="picker"><input type="search" placeholder="${esc(t('searchPh'))}" data-pick="${which}" aria-label="${esc(t(key))}"><ul class="search-results" hidden></ul></div>`;
   let result = `<div class="empty">${t('relPick')}</div>`;
   if (a && b) {
-    const path = shortestPath(a, b);
+    const path = relationPath(a, b);
     const nm = id => displayName(person(id));
     result = `<div class="card-box relate-answer"><div class="big">${esc(relSentence(a, b, nm))}</div>
       ${relWord(b, a) && a !== b ? `<div class="muted" style="margin-top:.4rem">${esc(relSentence(b, a, nm))}</div>` : ''}</div>
-      ${path && path.length > 1 ? `<div class="section-title">${t('relPath')}</div><div class="path">${path.map((s, i) => `
-        ${i ? `<div class="arrow">${esc(relWord(path[i - 1].id, s.id) || '')}</div>` : ''}
-        <a class="step" href="#/person/${esc(s.id)}">${avatar(person(s.id), 'sm')}${esc(nm(s.id))}</a>`).join('')}</div>` : ''}`;
+      ${path && path.length > 1 ? `<div class="section-title">${t('relPath')}</div>${pathDiagram(path, a, b)}` : ''}`;
   }
   view.innerHTML = `<div class="page"><div class="page-head"><h1>${t('relTitle')}</h1></div>
     <div class="relate-pickers">
@@ -89,6 +87,71 @@ export function renderRelate(view, a, b) {
   $$('[data-clear]', view).forEach(btn => btn.onclick = e => { e.preventDefault(); btn.dataset.clear === 'a' ? go('', b) : go(a, ''); });
   $('[data-swap]', view).onclick = () => go(b, a);
   if (!a || !b) setTimeout(() => $('[data-pick]', view)?.focus(), 50);
+}
+
+
+// ---------- relationship path as a mini family tree ----------
+// Going up to a parent stacks the card above; coming back down moves one column
+// right; a marriage sits side by side. Connectors are drawn like a family tree.
+function pathDiagram(path, a, b) {
+  const CW = 150, CH = 124, LH = 176, PAD = 12;
+  const nodes = [];
+  let col = 0, lvl = 0, last = null;
+  path.forEach((s, i) => {
+    const e = s.edge;
+    if (e === 'eParent') { if (last === 'eChild') col++; lvl--; }
+    if (e === 'eChild') { if (last === 'eParent') col++; lvl++; }
+    if (e === 'eSpouse') col++;
+    nodes.push({ id: s.id, edge: e, col, lvl, x: 0 });
+    if (e) last = e === 'eSpouse' ? last : e;
+  });
+  // a peak (up then down) sits centred between its two columns
+  nodes.forEach((n, i) => {
+    n.x = n.col;
+    const pv = nodes[i + 1];
+    if (n.edge === 'eParent' && pv?.edge === 'eChild') n.x = n.col + 0.5, n.peak = true;
+  });
+  const minL = Math.min(...nodes.map(n => n.lvl));
+  nodes.forEach(n => { n.px = PAD + n.x * CW; n.py = PAD + (n.lvl - minL) * LH; });
+  const width = PAD * 2 + (Math.max(...nodes.map(n => n.x)) + 1) * CW - (CW - 130);
+  const height = PAD * 2 + (Math.max(...nodes.map(n => n.lvl)) - minL) * LH + CH;
+  const cx = n => n.px + 65;
+  let lines = '';
+  nodes.forEach((n, i) => {
+    if (!i) return;
+    const p = nodes[i - 1];
+    if (n.edge === 'eSpouse') {
+      const y = n.py + 34, x1 = Math.min(p.px, n.px) + 130, x2 = Math.max(p.px, n.px);
+      lines += `<path class="pl marr" d="M${x1},${y - 3}H${x2}M${x1},${y + 3}H${x2}"/>`;
+      return;
+    }
+    const [top, bot] = n.edge === 'eParent' ? [n, p] : [p, n];
+    // a child of a couple hangs from the middle of the marriage line
+    const couple = n.edge === 'eChild' && p.edge === 'eSpouse' ? nodes[i - 2] : null;
+    let x0 = cx(top), y0 = top.py + CH;
+    if (couple) { x0 = (Math.min(couple.px, p.px) + 130 + Math.max(couple.px, p.px)) / 2; y0 = p.py + 37; }
+    const midY = bot.py - (LH - CH) / 2;
+    lines += `<path class="pl" d="M${x0},${y0}V${midY}H${cx(bot)}V${bot.py}"/>`;
+  });
+  const nm = id => displayName(person(id));
+  const cards = nodes.map((n, i) => {
+    const p = person(n.id);
+    const rel = n.id === a ? null : relWord(a, n.id);
+    const cls = n.id === a || n.id === b ? ' end' : n.peak ? ' peak' : '';
+    // both children descend from the same couple → name the other common ancestor too
+    const other = n.peak && (() => {
+      const x = parentsOf(nodes[i - 1].id), y = parentsOf(nodes[i + 1].id);
+      return x && y && x.union.id === y.union.id ? [x.father, x.mother].find(id => id && id !== n.id) : null;
+    })();
+    return `<a class="pnode${cls}" href="#/person/${esc(n.id)}" style="left:${n.px}px;top:${n.py}px;--branch:${branchColour(n.id)}">
+      ${avatar(p, 'sm')}<div class="nm">${esc(nm(n.id))}</div>
+      ${rel ? `<div class="rl">${esc(t('relOf', { a: nm(a), rel }))}</div>` : `<div class="rl">${esc(t('relStart'))}</div>`}
+      ${n.peak ? `<div class="pk">${esc(t('commonAncestor'))}${other ? ` & ${esc(nm(other))}` : ''}</div>` : ''}
+    </a>`;
+  }).join('');
+  return `<div class="pathtree-wrap"><div class="pathtree" style="width:${width}px;height:${height}px">
+    <svg width="${width}" height="${height}" aria-hidden="true">${lines}</svg>${cards}</div></div>
+    <p class="small muted">${esc(t('relPathHint'))}</p>`;
 }
 
 // ---------- Timeline ----------
@@ -123,7 +186,7 @@ export function renderGallery(view, { isEditing, onAddPhoto } = {}) {
   view.innerHTML = `<div class="page"><div class="page-head"><h1>${t('galTitle')}</h1></div>
     <div class="filters">${[['with', 'galWithPhoto', everyone.filter(p => p.photo).length], ['without', 'galNoPhoto', everyone.filter(p => !p.photo).length], ['all', 'galAll', everyone.length]].map(([k, l, n]) =>
       `<button class="chip ${galFilter === k ? 'on' : ''}" data-g="${k}" aria-pressed="${galFilter === k}">${t(l)} (${n})</button>`).join('')}</div>
-    <div class="gallery">${list.map(p => `<a href="#/person/${esc(p.id)}" style="--branch:${branchColour(p.id)}"><div class="tile">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy">` : esc((p.given || '?')[0])}</div>${nameOf(p)}${p.nickname ? `<div class="small muted">“${esc(p.nickname)}”</div>` : ''}</a>`).join('')}</div></div>`;
+    <div class="gallery">${list.map(p => `<a href="#/person/${esc(p.id)}" style="--branch:${branchColour(p.id)}"><div class="tile">${p.photo ? `<img ${srcAttr(p.photo)} alt="" loading="lazy">` : esc((p.given || '?')[0])}</div>${nameOf(p)}${p.nickname ? `<div class="small muted">“${esc(p.nickname)}”</div>` : ''}</a>`).join('')}</div></div>`;
   $$('[data-g]', view).forEach(b => b.onclick = () => { galFilter = b.dataset.g; renderGallery(view, { isEditing, onAddPhoto }); });
 }
 
@@ -155,30 +218,19 @@ export function renderStats(view) {
   const bdays = people.filter(p => isLiving(p) && p.birth?.m && p.birth?.d).map(p => ({ p, n: daysUntil(p.birth.m, p.birth.d) })).filter(x => x.n <= 60).sort((a, b) => a.n - b.n);
   const remember = people.filter(p => p.death?.m && p.death?.d).map(p => ({ p, n: daysUntil(p.death.m, p.death.d) })).sort((a, b) => a.n - b.n);
   const onDay = people.filter(p => (p.birth?.m === today.getMonth() + 1 && p.birth?.d === today.getDate()) || (p.death?.m === today.getMonth() + 1 && p.death?.d === today.getDate()));
-  const fams = Object.values(store.U).map(u => ({ u, n: kidsOf(u.id).length })).sort((a, b) => b.n - a.n).slice(0, 6);
   const unnamed = people.filter(p => !isNamed(p));
   const noDates = named.filter(p => !p.birth && !p.death).length;
   const gens = maxGenerations(mainFounder());
   const tile = (n, l) => `<div class="tile-stat"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`;
   const row = (p, right) => `<li>${avatar(p, 'sm')}<a href="#/person/${esc(p.id)}">${nameOf(p)}</a><span class="right">${right}</span></li>`;
-  const maxKids = fams[0]?.n || 1;
 
   view.innerHTML = `<div class="page"><div class="page-head"><h1>${t('statsTitle')}</h1></div>
     <div class="tiles">${tile(people.length, t('sPeople'))}${tile(named.length, t('sNamed'))}${tile(Object.keys(store.U).length, t('sFamilies'))}${tile(gens, t('sGens'))}${tile(photos, t('sPhotos'))}${tile(founders().length, t('sLines'))}</div>
-    <div class="two-col">
-      <section class="card-box"><h2>${t('upcoming')}</h2>
-        ${onDay.length ? `<p><strong>${t('onThisDay')}:</strong> ${onDay.map(p => `<a href="#/person/${esc(p.id)}">${nameOf(p)}</a>`).join(', ')}</p>` : ''}
-        ${bdays.length ? `<ul class="list-plain">${bdays.map(({ p, n }) => row(p, `${esc(fmtDate({ m: p.birth.m, d: p.birth.d }))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : `<p class="muted">${t('noneSoon')}</p>`}
-        ${remember.length ? `<h3 style="margin-top:1.2rem">${t('remembrance')}</h3><ul class="list-plain">${remember.slice(0, 6).map(({ p, n }) => row(p, `${esc(fmtDate(p.death))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : ''}
-      </section>
-      <section class="card-box"><h2>${t('biggestFamilies')}</h2>
-        <ul class="list-plain">${fams.map(({ u, n }) => {
-          const h = person(u.husband), w = person(u.wife);
-          return `<li style="display:grid;grid-template-columns:1fr auto;gap:.2rem .6rem"><span><a href="#/focus/${esc(u.husband || u.wife)}">${esc(displayName(h))}</a> & ${esc(displayName(w))}</span><span class="right">${n} ${t('children').toLowerCase()}</span>
-            <div class="bar" style="width:${Math.max(4, (n / maxKids) * 100)}%;grid-column:1/-1;background:${branchColour(u.husband || u.wife)}"></div></li>`;
-        }).join('')}</ul>
-      </section>
-    </div>
+    <section class="card-box"><h2>${t('upcoming')}</h2>
+      ${onDay.length ? `<p><strong>${t('onThisDay')}:</strong> ${onDay.map(p => `<a href="#/person/${esc(p.id)}">${nameOf(p)}</a>`).join(', ')}</p>` : ''}
+      ${bdays.length ? `<ul class="list-plain">${bdays.map(({ p, n }) => row(p, `${esc(fmtDate({ m: p.birth.m, d: p.birth.d }))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : `<p class="muted">${t('noneSoon')}</p>`}
+      ${remember.length ? `<h3 style="margin-top:1.2rem">${t('remembrance')}</h3><ul class="list-plain">${remember.slice(0, 6).map(({ p, n }) => row(p, `${esc(fmtDate(p.death))}<br>${esc(whenLabel(n))}`)).join('')}</ul>` : ''}
+    </section>
     <section class="card-box" style="margin-top:1rem"><h2>${t('helpTitle')}</h2><p class="muted">${t('helpIntro')}</p>
       <p class="small">${named.length - named.filter(p => p.photo).length} ${t('noPhoto')} · ${noDates} ${t('noDates')}</p>
       ${unnamed.length ? `<h3>${t('unnamed')} (${unnamed.length})</h3><ul class="list-plain">${unnamed.map(p => `<li>${avatar(p, 'sm')}<a href="#/person/${esc(p.id)}">${esc(contextLine(p.id) || t('unknown'))}</a><span class="right"><button class="btn sm" data-sg="${esc(p.id)}">${t('suggest')}</button></span></li>`).join('')}</ul>` : ''}
