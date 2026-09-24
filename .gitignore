@@ -1,0 +1,5 @@
+.claude/
+*.ftz
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,121 @@
+// English / Yoruba interface strings. Yoruba drafted by Claude — please review.
+const STR = {
+  en: {
+    tabChart: 'Tree', tabFocus: 'Family', tabRelate: 'Related?', tabTimeline: 'Timeline', tabGallery: 'Photos', tabStats: 'Stats',
+    searchPh: 'Search a name…', noResults: 'No one found', unknown: 'Unknown',
+    childOf: 'child of {names}', wifeOf: 'wife of {name}', husbandOf: 'husband of {name}', spouseOf: 'spouse of {name}',
+    bornAbbr: 'b.', diedAbbr: 'd.', deceased: 'Deceased', born: 'Born', died: 'Died', birthday: 'Birthday', age: 'Age',
+    relToYou: 'Your {rel}', thisIsMe: 'This is me', notMe: 'Not me', whoAreYou: 'Who are you?', youAre: 'You: {name}', pickMe: 'I am…',
+    meHint: 'Pick yourself once and every person will show how they are related to you.',
+    parents: 'Parents', father: 'Father', mother: 'Mother', spouses: 'Spouses', children: 'Children', siblings: 'Siblings', halfSiblings: 'Half-siblings',
+    grandparents: 'Grandparents', withSpouse: 'With {name}', withUnknown: 'Other parent unknown',
+    birthPlace: 'Birthplace', residence: 'Lives in', occupation: 'Occupation', burialPlace: 'Resting place', married: 'Married',
+    oriki: 'Oríkì / praise names', story: 'Story', notes: 'Notes', media: 'Photos & voice notes', nickname: 'Also known as',
+    details: 'Details',
+    viewInTree: 'Show in tree', focusHere: 'Family view', share: 'Share', suggest: 'Suggest a change', edit: 'Edit', relateTo: 'How are we related?',
+    linkCopied: 'Link copied', close: 'Close', cancel: 'Cancel', save: 'Save', delete: 'Delete', back: 'Back',
+    // chart
+    family: 'Family line', colourBy: 'Colour', cBranch: 'By branch', cGen: 'By generation', cSex: 'Male / female', cNone: 'No colour',
+    orient: 'Switch layout (top-down / sideways)',
+    expandAll: 'Expand all', collapseAll: 'Collapse', fit: 'Fit to screen', zoomIn: 'Zoom in', zoomOut: 'Zoom out', exportPng: 'Download image',
+    lineOf: '{name} line', people: 'people', branches: 'Branches', inLaw: 'Married in', other: 'Other', male: 'Male', female: 'Female', unknownSex: 'Unknown',
+    generation: 'Generation {n}', showFamily: 'Their family', moreKids: '{n} more',
+    // relate
+    relTitle: 'How are we related?', relPickA: 'Person', relPickB: 'Relative', relSwap: 'Swap', relNone: 'No family link found in the tree.',
+    relPath: 'The connection', relPick: 'Pick two people to see how they are related.', relIs: '{b} is {a}’s {rel}',
+    sameName: 'That’s the same person.',
+    eParent: 'parent of', eChild: 'child of', eSpouse: 'spouse of',
+    // timeline
+    tlTitle: 'Timeline', births: 'Births', deaths: 'Deaths', marriages: 'Marriages', tlEmpty: 'No dated events yet. Add dates to people to fill the timeline.',
+    tlNote: 'Birth years of living relatives are kept private.', bornEv: 'born', diedEv: 'died', marriedEv: 'married {name}',
+    // gallery
+    galTitle: 'Family photos', galAll: 'Everyone', galWithPhoto: 'With photo', galNoPhoto: 'Need a photo', addPhoto: 'Add photo',
+    // stats
+    statsTitle: 'Family at a glance', sPeople: 'people', sNamed: 'named', sFamilies: 'families', sGens: 'generations', sPhotos: 'photos', sLines: 'family lines',
+    upcoming: 'Upcoming birthdays', remembrance: 'Remembering', onThisDay: 'On this day', noneSoon: 'None in the next 60 days.',
+    today: 'today', inDays: 'in {n} days', tomorrow: 'tomorrow', yearsSince: '{n} years',
+    helpTitle: 'Help complete the tree', helpIntro: 'These relatives are missing details. Know something? Tap “Suggest”.',
+    unnamed: 'Unnamed people', noDates: 'without any dates', noPhoto: 'without a photo', biggestFamilies: 'Largest families',
+    // suggest
+    sgTitle: 'Suggest a change', sgAbout: 'About', sgType: 'What kind of change?', sgFix: 'Correct something', sgAdd: 'Add a relative', sgPhoto: 'Photo or story', sgOther: 'Other',
+    sgMsg: 'Your suggestion', sgMsgPh: 'e.g. His birthday is 12 March 1950. He had 3 children: …', sgName: 'Your name', sgContact: 'Phone or email (optional)',
+    sgViaForm: 'Send', sgViaWa: 'Send on WhatsApp', sgThanks: 'Thank you! Your suggestion was sent.', sgNeedMsg: 'Please write your suggestion first.',
+    sgGeneral: 'the family tree',
+    // menu
+    menuPrint: 'Print / save as PDF', menuPng: 'Download tree image', menuGed: 'Export GEDCOM (.ged)', menuJson: 'Download data (.json)',
+    menuEditor: 'Editor mode', menuEditorOff: 'Leave editor mode', menuSuggest: 'Suggest a change', menuAbout: 'About this site',
+    themeLight: 'Light', themeDark: 'Dark',
+    // editor
+    edBar: 'Editor mode', edUnsaved: '{n} unsaved change(s)', edSaved: 'All changes saved', edSaveGh: 'Save to GitHub', edDiscard: 'Discard',
+    edSaving: 'Saving…', edSavedOk: 'Saved! The public site updates in about a minute.', edTools: 'Editor tools',
+    edSetup: 'GitHub connection', edToken: 'Access token', edTokenHelp: 'A fine-grained token with “Contents: read and write” on this repo only. It is stored only in this browser.',
+    edOwner: 'Owner', edRepo: 'Repository', edBranch: 'Branch', edConnect: 'Connect', edTest: 'Test connection', edConnected: 'Connected ✓',
+    edPerson: 'Edit person', edNewPerson: 'New person', given: 'First name(s)', surname: 'Surname', sex: 'Sex', isDeceased: 'Deceased',
+    day: 'Day', month: 'Month', year: 'Year', birth: 'Birth', death: 'Death', photo: 'Photo', changePhoto: 'Change photo', removePhoto: 'Remove photo',
+    addMedia: 'Add photo / audio', recordVoice: 'Record voice note', stopRec: 'Stop recording', caption: 'Caption', addLink: 'Add link',
+    relatives: 'Relatives', addFather: 'Add father', addMother: 'Add mother', addSpouse: 'Add spouse', addChild: 'Add child', addSibling: 'Add sibling',
+    linkExisting: 'Link someone already in the tree', asSpouse: 'as spouse', asChild: 'as child', asParent: 'as parent',
+    childWith: 'Child with…', unknownPartner: 'unknown partner', removeFromParents: 'Unlink from parents', removeSpouse: 'Remove marriage',
+    deletePerson: 'Delete person', confirmDelete: 'Delete {name}? Their links to relatives are removed too.',
+    order: 'Birth order among siblings', marriageDate: 'Marriage date', marriagePlace: 'Marriage place',
+    needsAttention: 'Needs attention', issues: 'Possible data problems', siteSettings: 'Site settings', siteTitle: 'Site title', defaultPerson: 'Default person for Family view',
+    formSetup: 'Google Form', formOk: 'Google Form is connected.', formMissing: 'Not set up yet — see README “Google Form setup”.',
+    draftFound: 'You have unsaved edits from last time. Restore them?', restore: 'Restore',
+    conflict: 'Someone saved newer changes on GitHub since you started. Overwrite them with yours?',
+    livingNote: 'Birth year of living people is not published (privacy).',
+    issueDeathBeforeBirth: 'dies before being born', issueChildBeforeParent: 'born before (or too soon after) parent {name}', issueTooOld: 'parent {name} would be over 70',
+    issueFuture: 'date is in the future', issueNoSex: 'sex unknown', issueIsolated: 'not linked to anyone',
+    genericError: 'Something went wrong: {msg}',
+    about: 'This family tree was built from the Quick Family Tree app. Suggestions are welcome — tap a person, then “Suggest a change”.',
+  },
+  yo: {
+    tabChart: 'Igi ìdílé', tabFocus: 'Ìdílé', tabRelate: 'Ìbátan', tabTimeline: 'Ìtàn ọdún', tabGallery: 'Àwòrán', tabStats: 'Àkópọ̀',
+    searchPh: 'Wá orúkọ…', noResults: 'A kò rí ẹnìkan', unknown: 'A kò mọ̀',
+    childOf: 'ọmọ {names}', wifeOf: 'ìyàwó {name}', husbandOf: 'ọkọ {name}', spouseOf: 'ẹnìkejì {name}',
+    bornAbbr: 'bí', diedAbbr: 'kú', deceased: 'Ó ti re ilé', born: 'Ọjọ́ ìbí', died: 'Ọjọ́ ikú', birthday: 'Ọjọ́ ìbí', age: 'Ọjọ́ orí',
+    relToYou: '{rel} rẹ', thisIsMe: 'Èmi nìyí', notMe: 'Kì í ṣe èmi', whoAreYou: 'Ta ni ọ́?', youAre: 'Ìwọ: {name}', pickMe: 'Èmi ni…',
+    meHint: 'Yan ara rẹ lẹ́ẹ̀kan, gbogbo ènìyàn yóò sì fi hàn bí ẹ ṣe bá ara yín tan.',
+    parents: 'Òbí', father: 'Bàbá', mother: 'Ìyá', spouses: 'Ọkọ / Aya', children: 'Àwọn ọmọ', siblings: 'Ọmọ ìyá', halfSiblings: 'Ọmọ bàbá kan / ìyá kan',
+    grandparents: 'Àwọn òbí àgbà', withSpouse: 'Pẹ̀lú {name}', withUnknown: 'A kò mọ òbí kejì',
+    birthPlace: 'Ibi ìbí', residence: 'Ibi tí ó ń gbé', occupation: 'Iṣẹ́', burialPlace: 'Ibi ìsinmi', married: 'Ìgbéyàwó',
+    oriki: 'Oríkì', story: 'Ìtàn', notes: 'Àkọsílẹ̀', media: 'Àwòrán àti ohùn', nickname: 'Orúkọ ìnagijẹ',
+    details: 'Àlàyé',
+    viewInTree: 'Fi hàn nínú igi', focusHere: 'Wo ìdílé', share: 'Pín', suggest: 'Dábàá àtúnṣe', edit: 'Ṣàtúnṣe', relateTo: 'Báwo la ṣe bá ara wa tan?',
+    linkCopied: 'A ti da ìjápọ̀ kọ', close: 'Padé', cancel: 'Fagilé', save: 'Fipamọ́', delete: 'Pa rẹ́', back: 'Padà',
+    family: 'Ìran', colourBy: 'Àwọ̀', cBranch: 'Ẹ̀ka ìdílé', cGen: 'Ìran', cSex: 'Ọkùnrin / obìnrin', cNone: 'Láìsí àwọ̀',
+    orient: 'Yí ìtò padà',
+    expandAll: 'Ṣí gbogbo rẹ̀', collapseAll: 'Ká a', fit: 'Bá ojú-ìbojú mu', zoomIn: 'Sún mọ́', zoomOut: 'Sún jìnnà', exportPng: 'Gba àwòrán',
+    lineOf: 'Ìran {name}', people: 'ènìyàn', branches: 'Ẹ̀ka', inLaw: 'Àna', other: 'Àwọn míràn', male: 'Ọkùnrin', female: 'Obìnrin', unknownSex: 'A kò mọ̀',
+    generation: 'Ìran {n}', showFamily: 'Ìdílé wọn', moreKids: '{n} sí i',
+    relTitle: 'Báwo la ṣe bá ara wa tan?', relPickA: 'Ẹni kìíní', relPickB: 'Ẹni kejì', relSwap: 'Pààrọ̀', relNone: 'A kò rí ìbáṣepọ̀ ìdílé nínú igi yìí.',
+    relPath: 'Ìsopọ̀', relPick: 'Yan ènìyàn méjì láti rí bí wọ́n ṣe bá ara wọn tan.', relIs: '{b} jẹ́ {rel} {a}',
+    sameName: 'Ẹni kan náà ni.',
+    eParent: 'òbí', eChild: 'ọmọ', eSpouse: 'ọkọ/aya',
+    tlTitle: 'Ìtàn ọdún', births: 'Ìbí', deaths: 'Ikú', marriages: 'Ìgbéyàwó', tlEmpty: 'Kò sí ọjọ́ kankan síbẹ̀.',
+    tlNote: 'A kì í ṣàfihàn ọdún ìbí àwọn tó wà láàyè.', bornEv: 'ni a bí', diedEv: 'ó re ilé', marriedEv: 'fẹ́ {name}',
+    galTitle: 'Àwòrán ìdílé', galAll: 'Gbogbo ènìyàn', galWithPhoto: 'Tó ní àwòrán', galNoPhoto: 'Tí kò ní àwòrán', addPhoto: 'Fi àwòrán kún un',
+    statsTitle: 'Ìdílé ní ṣókí', sPeople: 'ènìyàn', sNamed: 'ní orúkọ', sFamilies: 'ìgbéyàwó', sGens: 'ìran', sPhotos: 'àwòrán', sLines: 'ìran ìdílé',
+    upcoming: 'Ọjọ́ ìbí tó ń bọ̀', remembrance: 'Ìrántí', onThisDay: 'Lónìí', noneSoon: 'Kò sí láàrin ọgọ́ta ọjọ́.',
+    today: 'lónìí', inDays: 'ní ọjọ́ {n}', tomorrow: 'lọ́la', yearsSince: 'ọdún {n}',
+    helpTitle: 'Ràn wá lọ́wọ́ láti parí igi náà', helpIntro: 'Àwọn ẹbí yìí kò ní àlàyé tó péye. Ṣé o mọ nǹkan kan? Tẹ “Dábàá”.',
+    unnamed: 'Àwọn tí kò ní orúkọ', noDates: 'láìsí ọjọ́', noPhoto: 'láìsí àwòrán', biggestFamilies: 'Ìdílé tó tóbi jù',
+    sgTitle: 'Dábàá àtúnṣe', sgAbout: 'Nípa', sgType: 'Irú àtúnṣe wo?', sgFix: 'Ṣàtúnṣe nǹkan', sgAdd: 'Fi ẹbí kún un', sgPhoto: 'Àwòrán tàbí ìtàn', sgOther: 'Òmíràn',
+    sgMsg: 'Àbá rẹ', sgMsgPh: 'Àpẹẹrẹ: Wọ́n bí i ní 12 Ẹrẹ̀nà 1950…', sgName: 'Orúkọ rẹ', sgContact: 'Nọ́ńbà fóònù tàbí ímeèlì (kò pọn dandan)',
+    sgViaForm: 'Fi ránṣẹ́', sgViaWa: 'Fi ránṣẹ́ lórí WhatsApp', sgThanks: 'Ẹ ṣé! A ti gba àbá rẹ.', sgNeedMsg: 'Jọ̀wọ́ kọ àbá rẹ ná.',
+    sgGeneral: 'igi ìdílé',
+    menuPrint: 'Tẹ̀ jáde / PDF', menuPng: 'Gba àwòrán igi', menuGed: 'Gbé GEDCOM jáde (.ged)', menuJson: 'Gba dátà (.json)',
+    menuEditor: 'Ipò olóòtú', menuEditorOff: 'Kúrò ní ipò olóòtú', menuSuggest: 'Dábàá àtúnṣe', menuAbout: 'Nípa ojú-òpó yìí',
+    themeLight: 'Ìmọ́lẹ̀', themeDark: 'Òkùnkùn',
+    about: 'A ṣe igi ìdílé yìí láti inú áàpù Quick Family Tree. A gba àbá — tẹ ẹnìkan, lẹ́yìn náà “Dábàá àtúnṣe”.',
+  },
+};
+
+let current = 'en';
+try { current = localStorage.getItem('ft.lang') || 'en'; } catch (e) {}
+export const lang = () => current;
+export function setLang(l) { current = l; try { localStorage.setItem('ft.lang', l); } catch (e) {} document.documentElement.lang = l; }
+export function t(key, vars) {
+  let s = STR[current][key] ?? STR.en[key] ?? key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+  return s;
+}
