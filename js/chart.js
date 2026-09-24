@@ -7,6 +7,7 @@ import { esc, icon, html, $, download, toast, srcAttr } from './ui.js';
 const W = 146, H = 60, SG = 22, HG = 18, VG = 62;
 const CLIP = '<clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="28" cy="30" r="19"/></clipPath>';
 const PALETTE = ['--b1', '--b2', '--b3', '--b4', '--b5', '--b6', '--b7', '--b8'];
+const SPOUSE_COLS = ['--b1', '--b2', '--b7', '--b5', '--b3']; // tell apart the families of someone with several partners
 const GENS = ['--g0', '--g1', '--g2', '--g3', '--g4', '--g5'];
 
 const CHART_CSS = `
@@ -21,7 +22,8 @@ const CHART_CSS = `
 .phbg{fill:var(--surface-3)}
 .link{fill:none;stroke:var(--line-strong);stroke-width:1.5}
 .mline{stroke:var(--line-strong);stroke-width:2}
-.mline.sep{stroke-dasharray:4 3}
+.mline.sep{stroke-dasharray:5 3}
+.sepmark{stroke:var(--text-2);stroke-width:2;stroke-linecap:round}
 .tog{cursor:pointer}
 .tog circle{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
 .tog text{font:600 11px Inter,system-ui,sans-serif;fill:var(--text-2)}
@@ -283,8 +285,13 @@ function draw() {
   const hasParents = pid => !!person(pid)?.parents;
   for (const n of nodes) {
     // marriage lines
-    n.spouses.forEach(s => {
-      links += `<line class="mline${s.sep ? ' sep' : ''}" x1="${n.px + W}" y1="${n.py + H / 2}" x2="${s.x}" y2="${s.y + H / 2}"/>`;
+    const multi = n.spouses.length > 1;
+    const col = si => multi && si >= 0 ? ` style="stroke:var(${SPOUSE_COLS[si % SPOUSE_COLS.length]})"` : '';
+    n.spouses.forEach((s, si) => {
+      const y = n.py + H / 2;
+      links += `<line class="mline${s.sep ? ' sep' : ''}"${col(si)} x1="${n.px + W}" y1="${y}" x2="${s.x}" y2="${y}"/>`;
+      // "no longer together": a double slash across the visible part of the line
+      if (s.sep) { const mx = s.x - SG / 2 - (si === 0 ? 5 : 0); links += `<path class="sepmark" d="M${mx - 5},${y + 7}L${mx - 1},${y - 7}M${mx + 1},${y + 7}L${mx + 5},${y - 7}"/>`; }
     });
     // child connectors
     n.groups.forEach((g, gi) => {
@@ -293,7 +300,7 @@ function draw() {
       const oy = g.si === 0 && !fromSp ? n.py + H / 2 : n.py + H;
       const busY = n.py + H + VG / 2 - Math.min(gi, 3) * 6; // stagger so separate families don't merge
       const xs = g.kids.map(k => k.px + W / 2);
-      links += `<path class="link" d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${n.py + H + VG}`).join('')}"/>`;
+      links += `<path class="link"${col(g.si)} d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${n.py + H + VG}`).join('')}"/>`;
     });
     cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids && !n.lock ? (n.collapsed ? '+' + n.kidCount : '−') : null });
     n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: !ctx.mode && hasParents(s.pid) && !descendants(root).has(s.pid) }); });
