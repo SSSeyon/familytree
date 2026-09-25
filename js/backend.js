@@ -106,6 +106,7 @@ export function resolveMedia(src) {
 export async function sendSuggestion(s) {
   const fields = { created: TS() };
   for (const k of ['person', 'personId', 'type', 'message', 'name', 'contact', 'link']) fields[k] = S(String(s[k] || '').slice(0, 3000));
+  if (s.add) fields.add = S(String(s.add).slice(0, 8000)); // "Add my family" details (JSON)
   await fsFetch('/suggestions', { method: 'POST', body: JSON.stringify({ fields }) });
 }
 export async function listSuggestions() {

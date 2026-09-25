@@ -1,5 +1,6 @@
 // Person drawer, "This is me", sharing and "Suggest a change".
-import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, isLiving, fmtDate, contextLine } from './data.js';
+import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, isLiving, fmtDate, contextLine, descendantStats } from './data.js';
+import { openAddFamily } from './family.js';
 import { relToYou } from './relate.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, toast, modal, nameOf, srcAttr } from './ui.js';
@@ -50,6 +51,12 @@ export function datesLine(p) {
   return out.join(' · ');
 }
 
+// "37 descendants across 4 generations" (shown for anyone with grandchildren or more).
+export function descLine(pid) {
+  const { count, gens } = descendantStats(pid);
+  return gens >= 2 ? `<div class="desc-line small">${esc(t('descStats', { n: count, g: gens }))}</div>` : '';
+}
+
 export function openPerson(pid) {
   const p = person(pid);
   if (!p) return;
@@ -94,9 +101,11 @@ export function openPerson(pid) {
         ${avatar(p, 'xl')}
         <h2>${nameOf(p)}</h2>
         ${p.nickname ? `<div class="nick">“${esc(p.nickname)}”</div>` : ''}
+        ${p.meaning ? `<div class="meaning small"><span class="muted">${t('nameMeaning')}:</span> ${esc(p.meaning)}</div>` : ''}
         <div class="dates small">${esc(datesLine(p))}</div>
         ${!p.given && !p.surname ? `<div class="small muted">${esc(contextLine(pid))}</div>` : ''}
         ${rel ? `<div class="rel-me">${esc(rel)}</div>` : ''}
+        ${descLine(pid)}
       </div>
       ${p.oriki ? `<div class="section-title">${t('oriki')}</div><blockquote class="oriki">${esc(p.oriki)}</blockquote>` : ''}
       ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<dt>${t(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
@@ -113,6 +122,7 @@ export function openPerson(pid) {
         ${parentsOf(pid) ? `<a class="btn" href="#/fan/${esc(pid)}">${icon('fan')}${t('fanChart')}</a>` : ''}
         <a class="btn" href="#/relate/${esc(me && me !== pid ? me : '')}/${esc(pid)}">${icon('link')}${t('relateTo')}</a>
         <button class="btn" data-a="me">${icon('user')}${me === pid ? t('notMe') : t('thisIsMe')}</button>
+        <button class="btn" data-a="addfam">${icon('plus')}${t('afButton')}</button>
         <button class="btn primary" data-a="suggest">${icon('chat')}${t('suggest')}</button>
       </div>
     </div></aside>`);
@@ -130,6 +140,7 @@ export function openPerson(pid) {
     if (a === 'edit') { close(); hooks.edit?.(pid); }
     if (a === 'me') { setMe(me === pid ? null : pid); openPerson(pid); }
     if (a === 'suggest') openSuggest(pid);
+    if (a === 'addfam') openAddFamily(pid);
     const play = e.target.closest('[data-play]');
     if (play) {
       play.disabled = true;

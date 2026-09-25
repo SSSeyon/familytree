@@ -24,12 +24,13 @@ service cloud.firestore {
       allow read, write: if isEditor();
     }
 
-    // "Suggest a change": anyone can send one; only the editor can read or clear them.
+    // "Suggest a change" and "Add my family": anyone can send one; only the editor can read or clear them.
     match /suggestions/{id} {
-      allow create: if request.resource.data.keys().hasOnly(['person', 'personId', 'type', 'message', 'name', 'contact', 'link', 'created'])
+      allow create: if request.resource.data.keys().hasOnly(['person', 'personId', 'type', 'message', 'name', 'contact', 'link', 'created', 'add'])
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0
-        && request.resource.data.message.size() <= 3000;
+        && request.resource.data.message.size() <= 3000
+        && (!('add' in request.resource.data) || (request.resource.data.add is string && request.resource.data.add.size() <= 8000));
       allow read, delete: if isEditor();
     }
   }

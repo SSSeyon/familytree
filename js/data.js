@@ -155,6 +155,18 @@ export function descendants(pid) {
   return out;
 }
 
+// How many descendants someone has, and across how many generations.
+export function descendantStats(pid) {
+  let count = 0, gens = 0, level = [pid];
+  const seen = new Set([pid]);
+  while (level.length) {
+    const next = level.flatMap(childrenOf).filter(c => !seen.has(c) && seen.add(c));
+    if (next.length) { gens++; count += next.length; }
+    level = next;
+  }
+  return { count, gens };
+}
+
 // Top-of-line ancestors (no parents recorded, have children), biggest line first.
 export function founders() {
   if (idx.founders) return idx.founders;

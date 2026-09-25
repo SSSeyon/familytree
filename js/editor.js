@@ -5,6 +5,8 @@ import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch,
 import { getMe, setMe, closePerson } from './person.js';
 import { searchRow } from './views.js';
 import { renderChecks } from './check.js';
+import { describeAddition } from './family.js';
+import { recordNews } from './news.js';
 import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
@@ -42,6 +44,7 @@ export async function enterEditor(rerender) {
   }
   ED.on = true;
   ED.baseRev = store.tree.meta?.rev || 0;
+  ED.base = JSON.parse(JSON.stringify(store.tree)); // what "What's new" compares against
   try { localStorage.setItem('ft.editing', '1'); } catch (e) {}
   const draft = readDraft();
   if (draft?.dirty && await confirmBox(t('draftFound'), t('restore'))) {
@@ -113,6 +116,7 @@ async function saveAll() {
     }
     ED.uploads.clear();
     // 2. the tree itself
+    recordNews(ED.base, store.tree);
     const clean = sanitized(store.tree);
     let r = await saveTree(clean, ED.baseRev);
     if (r.conflict) {
@@ -122,6 +126,7 @@ async function saveAll() {
     clean.meta = { ...(clean.meta || {}), rev: r.rev, updated: r.updated };
     setTree(clean); cacheTree();
     ED.baseRev = r.rev; ED.dirty = 0; clearDraft();
+    ED.base = JSON.parse(JSON.stringify(clean));
     toast(t('edSavedOk'), 4000);
   } catch (e) {
     const out = e.message === 'signed-out' || e.message === 'not-allowed';
@@ -277,6 +282,7 @@ export function editPerson(pid) {
       <label class="field"><span>${t('nickname')}</span><input type="text" name="nickname" value="${esc(p.nickname || '')}" placeholder="Baba …, Iya …"></label>
       <div class="field"><span>${t('sex')}</span><div class="seg">${[['M', t('male')], ['F', t('female')], ['U', t('unknownSex')]].map(([v, l]) => `<label><input type="radio" name="sex" value="${v}" ${p.sex === v ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
     </div>
+    <label class="field"><span>${t('nameMeaning')}</span><input type="text" name="meaning" value="${esc(p.meaning || '')}" placeholder="${esc(t('nameMeaningPh'))}"></label>
     <fieldset><legend>${t('birth')}</legend>${dateInputs('b', p.birth)}
       <input type="text" name="birthPlace" placeholder="${t('birthPlace')}" value="${esc(p.birthPlace || '')}">
       <div class="small muted">${t('livingNote')}</div></fieldset>
@@ -338,7 +344,7 @@ export function editPerson(pid) {
   const apply = () => {
     const fd = new FormData(body);
     const s = k => (fd.get(k) || '').toString().trim();
-    Object.assign(p, { given: s('given'), surname: s('surname'), nickname: s('nickname'), sex: fd.get('sex') || 'U', birthPlace: s('birthPlace'), burialPlace: s('burialPlace'), residence: s('residence'), occupation: s('occupation'), oriki: s('oriki'), bio: s('bio'), notes: s('notes') });
+    Object.assign(p, { given: s('given'), surname: s('surname'), nickname: s('nickname'), meaning: s('meaning'), sex: fd.get('sex') || 'U', birthPlace: s('birthPlace'), burialPlace: s('burialPlace'), residence: s('residence'), occupation: s('occupation'), oriki: s('oriki'), bio: s('bio'), notes: s('notes') });
     const b = readDate(fd, 'b'), d = readDate(fd, 'd');
     b ? (p.birth = b) : delete p.birth;
     d ? (p.death = d) : delete p.death;
@@ -474,19 +480,70 @@ export function renderEditorPage(view, rerender) {
   loadSuggestions($('[data-sugg]', view));
 }
 
+// ---------- "Add my family" ----------
+const applied = new Set(); // suggestions added to the tree this session
+
+// Creates the people described by an "Add my family" form. Returns their new ids.
+function applyAddition(add) {
+  const base = person(add.pid);
+  if (!base) return [];
+  const made = [];
+  for (const e of add.people || []) {
+    const fields = { given: e.given || '', surname: e.surname || '', sex: e.sex || 'U' };
+    if (e.birth) fields.birth = { ...e.birth };
+    if (e.dead) { fields.deceased = true; if (e.death?.y) fields.death = { y: e.death.y }; }
+    const id = createPerson(fields);
+    made.push(id);
+    if (e.rel === 'spouse') marry(base.id, id);
+    else if (e.rel === 'parent') { if (!setParent(base.id, id)) { deletePerson(id); made.pop(); } }
+    else if (e.rel === 'sibling') {
+      if (!base.parents) { base.parents = createUnion(); base.order = 0; }
+      person(id).parents = base.parents; person(id).order = kidsOf(base.parents).length;
+    } else { // child
+      let uid = e.union && unionsOf(base.id).some(u => u.id === e.union) ? e.union : null;
+      if (!uid && e.otherName) {
+        const [g, ...rest] = e.otherName.trim().split(/\s+/);
+        uid = marry(base.id, createPerson({ given: g, surname: rest.join(' '), sex: base.sex === 'M' ? 'F' : base.sex === 'F' ? 'M' : 'U' }));
+      }
+      if (!uid) uid = unionsOf(base.id).find(u => !spouseIn(u, base.id))?.id || createUnion(base.sex === 'F' ? null : base.id, base.sex === 'F' ? base.id : null);
+      person(id).parents = uid; person(id).order = kidsOf(uid).length;
+    }
+  }
+  return made;
+}
+
+// Warn when someone in the form may already be in the tree (same first name among close family).
+function possibleRepeats(add) {
+  const near = new Set([add.pid, ...childrenOf(add.pid), ...parentIds(add.pid), ...unionsOf(add.pid).map(u => spouseIn(u, add.pid)).filter(Boolean)]);
+  const pp = person(add.pid)?.parents; if (pp) kidsOf(pp).forEach(k => near.add(k));
+  const norm = s => (s || '').toLowerCase().trim();
+  const hits = (add.people || []).map(e => [...near].find(id => id && norm(person(id)?.given) === norm(e.given) && e.given)).filter(Boolean);
+  return hits.length ? `<div class="small warn-note">⚠ ${esc(t('afMaybeThere', { names: [...new Set(hits)].map(id => displayName(person(id))).join(', ') }))}</div>` : '';
+}
+
 // Messages sent with "Suggest a change" (read-only for everyone but editors).
 async function loadSuggestions(box) {
   try {
     const list = await listSuggestions();
     if (!list.length) { box.textContent = t('noSuggestions'); return; }
     box.classList.remove('muted');
+    const adds = new Map();
+    for (const s of list) { try { const a = s.add && JSON.parse(s.add); if (a?.people?.length && person(a.pid)) adds.set(s.id, a); } catch (e) {} }
     box.innerHTML = list.map(s => `<div class="sugg">
       <div><strong>${esc(s.person || '')}</strong> · <span class="muted">${esc(s.type || '')} · ${esc((s.created || '').slice(0, 10))}</span></div>
-      <div style="white-space:pre-wrap">${esc(s.message || '')}</div>
+      <div style="white-space:pre-wrap">${esc(adds.has(s.id) ? describeAddition(adds.get(s.id)) : s.message || '')}</div>
+      ${adds.has(s.id) ? possibleRepeats(adds.get(s.id)) : ''}
       <div class="muted">${esc([s.name, s.contact].filter(Boolean).join(' · '))}</div>
-      <div class="row">${s.personId && person(s.personId) ? `<button class="btn sm" data-edit="${esc(s.personId)}">${t('edit')}</button>` : ''}<button class="btn sm ghost" data-done="${esc(s.id)}">${icon('check')}${t('sgDone')}</button></div>
+      <div class="row">${adds.has(s.id) ? (applied.has(s.id) ? `<span class="small">✓ ${esc(t('afAdded', { n: adds.get(s.id).people.length }))}</span>` : `<button class="btn sm primary" data-add="${esc(s.id)}">${icon('plus')}${t('afApply')}</button>`) : ''}${s.personId && person(s.personId) ? `<button class="btn sm" data-edit="${esc(s.personId)}">${t('edit')}</button>` : ''}<button class="btn sm ghost" data-done="${esc(s.id)}">${icon('check')}${t('sgDone')}</button></div>
     </div>`).join('');
     $$('[data-edit]', box).forEach(b => b.onclick = () => editPerson(b.dataset.edit));
+    $$('[data-add]', box).forEach(b => b.onclick = () => {
+      const made = applyAddition(adds.get(b.dataset.add));
+      if (!made.length) return;
+      applied.add(b.dataset.add);
+      commit();
+      toast(t('afAddedToast'), 5000);
+    });
     $$('[data-done]', box).forEach(b => b.onclick = async () => {
       b.disabled = true;
       try { await deleteSuggestion(b.dataset.done); b.closest('.sugg').remove(); if (!box.children.length) box.textContent = t('noSuggestions'); }

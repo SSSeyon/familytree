@@ -17,6 +17,9 @@ export function applyTheme() {
   else document.documentElement.dataset.theme = pref;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark() ? '#0a3a29' : '#006343');
 }
+// Larger text for easier reading (per device).
+export const bigText = () => { try { return localStorage.getItem('ft.big') === '1'; } catch (e) { return false; } };
+export function applyTextSize() { document.documentElement.classList.toggle('big', bigText()); }
 export function isDark() {
   const set = document.documentElement.dataset.theme;
   return set ? set === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -75,6 +78,12 @@ export function renderSettings(view, rerender) {
       ${seg('theme', [['system', t('themeSystem')], ['light', t('themeLight')], ['dark', t('themeDark')]], themePref)}    </section>
 
     <section class="card-box set-row">
+      <h2>${icon('text')} ${t('textSize')}</h2>
+      <label class="switch"><input type="checkbox" data-big ${bigText() ? 'checked' : ''}><span class="track"></span>${t('bigText')}</label>
+      <p class="small muted">${t('bigTextHelp')}</p>
+    </section>
+
+    <section class="card-box set-row">
       <h2>${t('installTitle')}</h2>
       <div data-install>${installBlock()}</div>
     </section>
@@ -117,6 +126,7 @@ export function renderSettings(view, rerender) {
   attachSearch(inp, inp.nextElementSibling, p => { setMe(p.id); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: searchRow });
   $$('input[name=lang]', view).forEach(r => r.onchange = () => { setLang(r.value); window.dispatchEvent(new Event('ft:lang')); });
   $$('input[name=theme]', view).forEach(r => r.onchange = () => { try { localStorage.setItem('ft.theme', r.value); } catch (e) {} applyTheme(); window.dispatchEvent(new Event('ft:theme')); });
+  $('[data-big]', view).onchange = e => { try { e.target.checked ? localStorage.setItem('ft.big', '1') : localStorage.removeItem('ft.big'); } catch (er) {} applyTextSize(); };
   const tg = $('[data-ed-toggle]', view);
   if (tg) tg.onchange = () => tg.checked ? enterEditor(rerender) : hideEditor();
   view.onclick = async e => {

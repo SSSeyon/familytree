@@ -6,7 +6,7 @@ const REM_CACHE = 'ft-reminders'; // written by js/month.js
 const SHELL = [
   './', 'index.html', 'version.js', 'config.js', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/data.js', 'js/i18n.js', 'js/ui.js', 'js/chart.js', 'js/views.js', 'js/person.js',
-  'js/relate.js', 'js/editor.js', 'js/export.js', 'js/settings.js', 'js/backend.js', 'js/month.js', 'js/fan.js', 'js/check.js',
+  'js/relate.js', 'js/editor.js', 'js/export.js', 'js/settings.js', 'js/backend.js', 'js/month.js', 'js/fan.js', 'js/check.js', 'js/family.js', 'js/news.js',
   'data/tree.json', 'icons/icon-192.png', 'icons/favicon-64.png',
 ];
 

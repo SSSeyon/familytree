@@ -4,10 +4,11 @@ import { t, lang } from './i18n.js';
 import { esc, icon, avatar, $, $$, toast, attachSearch } from './ui.js';
 import { renderChart, redrawChart } from './chart.js';
 import { renderFan } from './fan.js';
+import { hasUnseenNews } from './news.js';
 import { renderFocus, renderRelate, renderExplore, searchRow } from './views.js';
 import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPerson } from './person.js';
 import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
-import { renderSettings, applyTheme, isDark, toggleTheme } from './settings.js';
+import { renderSettings, applyTheme, applyTextSize, isDark, toggleTheme } from './settings.js';
 import { resolveMedia } from './backend.js';
 import { scheduleReminders } from './month.js';
 
@@ -78,7 +79,7 @@ function drawShell() {
   const title = store.tree?.meta?.title || 'Azandowanu Family';
   document.title = title;
   $('#site-title').textContent = title;
-  const tabHtml = TABS.map(([k, l, ic]) => `<a href="#/${k}" data-tab="${k}">${icon(ic)}<span>${t(l)}</span></a>`).join('');
+  const tabHtml = TABS.map(([k, l, ic]) => `<a href="#/${k}" data-tab="${k}">${icon(ic)}<span>${t(l)}</span>${k === 'explore' && hasUnseenNews() ? '<i class="new-dot"></i>' : ''}</a>`).join('');
   $('#tabs').innerHTML = tabHtml;
   $('#bottom-tabs').innerHTML = tabHtml;
   $('#search').placeholder = t('searchPh');
@@ -139,7 +140,7 @@ async function sync() {
 
 async function init() {
   document.documentElement.lang = lang() === 'gun' ? 'guw' : lang();
-  applyTheme();
+  applyTheme(); applyTextSize();
   try { await loadTree(); }
   catch (e) { view.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   wire();

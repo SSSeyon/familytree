@@ -11,7 +11,9 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 - A timeline, a photo gallery and family stats.
 - English, Yorùbá and Gungbe, plus light and dark mode.
 - Share links; PNG, print and GEDCOM export.
-- A "Suggest a change" button that sends to the editors or to WhatsApp.
+- A "Suggest a change" button, and an "Add family" form where relatives list missing people (a new baby, a spouse…). Editors add them to the tree with one tap.
+- "What's new": each save lists new babies, photos, stories and marriages, ready to share on WhatsApp.
+- Name meanings, descendant counts for elders, and a larger-text setting.
 
 **What you (the editor) get:** a built-in editor unlocked with a family passphrase. Editor tools include a tree checker that flags likely mistakes (a child born before a parent, dates after death, possible duplicates). It syncs through Firebase (free plan). The site also installs as a phone app (PWA).
 
@@ -20,7 +22,7 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 | Path | What it is |
 |---|---|
 | `index.html`, `css/`, `js/` | The app |
-| `version.js` | App version shown in Settings (`V1.7`). **Bump it on every update**; this also refreshes everyone's offline copy. |
+| `version.js` | App version shown in Settings (`V1.8`). **Bump it on every update**; this also refreshes everyone's offline copy. |
 | `config.js` | Settings: Firebase details, WhatsApp number, start person, privacy |
 | `backend/firestore.rules` | Security rules to paste into Firebase |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable app (PWA) and offline support |
@@ -42,7 +44,7 @@ The passphrase is the password of one Firebase user. Firebase checks it, so it n
 
 1. Go to <https://console.firebase.google.com> → **Create a project** (e.g. "azandowanu-family"). You can turn Google Analytics off. Stay on the free **Spark** plan.
 2. **Build → Firestore Database → Create database** → pick a location near you → start in **production mode**.
-3. In Firestore, open the **Rules** tab. Replace everything with the contents of [`backend/firestore.rules`](backend/firestore.rules), then **Publish**.
+3. In Firestore, open the **Rules** tab. Replace everything with the contents of [`backend/firestore.rules`](backend/firestore.rules), then **Publish**. Do this again whenever that file changes (it last changed in V1.8, for "Add family").
 4. **Build → Authentication → Get started → Sign-in method → Email/Password → Enable → Save.**
 5. **Authentication → Users → Add user:**
    - Email: `editor@azandowanu.family` (it doesn't need to be a real mailbox)

@@ -493,3 +493,34 @@ legend { font-weight: 600; font-size: .85rem; padding: 0 .3rem; }
 .ck-people { display: flex; flex-wrap: wrap; gap: .3rem .5rem; align-items: center; }
 .ck-people a { display: inline-flex; align-items: center; gap: .35rem; font-weight: 500; }
 .ck-list .hidden-ck { opacity: .55; }
+
+/* Larger text (Settings) */
+html.big { font-size: 18.5px; }
+html.big body { font-size: 17.5px; }
+html.big .small { font-size: .9rem; }
+
+/* "new" dot on the Explore tab and the What's new pill */
+.tabs a, .bottom-tabs a, .subnav a { position: relative; }
+.new-dot { position: absolute; top: .25rem; right: .35rem; width: 8px; height: 8px; border-radius: 50%; background: var(--b8); box-shadow: 0 0 0 2px var(--surface); }
+.subnav { overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
+.subnav::-webkit-scrollbar { display: none; }
+.subnav a { flex: none; }
+
+/* Person extras */
+.hero .meaning { margin-top: .35rem; max-width: 32rem; }
+.desc-line { color: var(--text-2); margin-top: .35rem; }
+.focus > .desc-line { text-align: center; margin: .4rem 0 0; }
+
+/* Add my family */
+.af { display: grid; gap: .9rem; }
+.af-row { display: grid; gap: .6rem; border: 1px solid var(--line); border-radius: 12px; padding: .7rem .8rem .8rem; }
+.af-row legend { font-weight: 600; padding: 0 .3rem; }
+.af-row [data-remove] { justify-self: start; }
+.af [data-more] { justify-self: start; }
+.warn-note { background: color-mix(in srgb, var(--b4) 18%, var(--surface)); border-radius: 8px; padding: .35rem .6rem; }
+
+/* What's new */
+.news .news-head { justify-content: space-between; align-items: center; }
+.news .news-head h2 { margin: 0; }
+.news-list li .grow { flex: 1; min-width: 0; }
+.news-list a { font-weight: 600; }

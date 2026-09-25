@@ -2,10 +2,12 @@
 import { store, person, parentsOf, unionsOf, spouseIn, kidsOf, siblingsOf, displayName, lifeSpan, isLiving, fmtDate, search, contextLine, allPeople, founders, mainFounder, isNamed, descendants, childrenOf } from './data.js';
 import { relSentence, relWord, relToYou, relationPath } from './relate.js';
 import { branchColour } from './chart.js';
-import { getMe, openSuggest, datesLine, rememberPerson } from './person.js';
+import { getMe, openSuggest, datesLine, rememberPerson, descLine } from './person.js';
+import { openAddFamily } from './family.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, attachSearch, nameOf, srcAttr } from './ui.js';
 import { renderMonth } from './month.js';
+import { renderNews, hasUnseenNews } from './news.js';
 
 const searchRow = p => {
   const me = getMe(), rel = me && me !== p.id ? relToYou(me, p.id) : null;
@@ -48,9 +50,11 @@ export function renderFocus(view, pid) {
       ${pcard(pid, 'center', { href: `#/person/${esc(pid)}` })}
       ${unions.filter(u => spouseIn(u, pid)).map(u => `<span class="amp muted" title="${u.separated ? esc(t('separated')) : ''}">${u.separated ? '⚮' : '⚭'}</span>${pcard(spouseIn(u, pid), u.separated ? 'sep' : '')}`).join('')}
     </div>
+    ${descLine(pid)}
     <div class="focus-actions">
       <a class="btn sm" href="#/person/${esc(pid)}">${icon('info')}${t('details')}</a>
       <a class="btn sm" href="#/chart/${esc(pid)}">${icon('tree')}${t('viewInTree')}</a>
+      <button class="btn sm" data-addfam>${icon('plus')}${t('afButton')}</button>
       <button class="btn sm" data-suggest>${icon('chat')}${t('suggest')}</button>
     </div>
     ${unions.some(u => kidsOf(u.id).length) ? `<div class="fam-connector"></div><div class="fam-label">${t('children')}</div>` : ''}
@@ -62,6 +66,7 @@ export function renderFocus(view, pid) {
     ${sibs.length ? `<div class="fam-label">${t('siblings')}</div><div class="fam-row">${sibs.map(s => pcard(s, 'sm')).join('')}</div>` : ''}
   </div>`;
   $('[data-suggest]', view).onclick = () => openSuggest(pid);
+  $('[data-addfam]', view).onclick = () => openAddFamily(pid);
 }
 
 // ---------- Relationship finder ----------
@@ -230,12 +235,13 @@ export { searchRow };
 
 // ---------- Explore: photos / timeline / stats in one tab ----------
 export function renderExplore(view, sub) {
-  sub = ['month', 'photos', 'timeline', 'stats'].includes(sub) ? sub : (() => { try { return localStorage.getItem('ft.explore') || 'month'; } catch (e) { return 'month'; } })();
+  sub = ['month', 'news', 'photos', 'timeline', 'stats'].includes(sub) ? sub : (() => { try { return localStorage.getItem('ft.explore') || 'month'; } catch (e) { return 'month'; } })();
   try { localStorage.setItem('ft.explore', sub); } catch (e) {}
-  view.innerHTML = `<nav class="subnav" aria-label="${esc(t('tabExplore'))}">${[['month', 'thisMonth', 'cake'], ['photos', 'tabGallery', 'photo'], ['timeline', 'tabTimeline', 'clock'], ['stats', 'tabStats', 'chart']]
-    .map(([k, l, ic]) => `<a href="#/explore/${k}" ${k === sub ? 'aria-current="page"' : ''}>${icon(ic)}${t(l)}</a>`).join('')}</nav><div class="explore-body"></div>`;
+  view.innerHTML = `<nav class="subnav" aria-label="${esc(t('tabExplore'))}">${[['month', 'thisMonth', 'cake'], ['news', 'whatsNew', 'spark'], ['photos', 'tabGallery', 'photo'], ['timeline', 'tabTimeline', 'clock'], ['stats', 'tabStats', 'chart']]
+    .map(([k, l, ic]) => `<a href="#/explore/${k}" ${k === sub ? 'aria-current="page"' : ''}>${icon(ic)}${t(l)}${k === 'news' && hasUnseenNews() ? '<i class="new-dot"></i>' : ''}</a>`).join('')}</nav><div class="explore-body"></div>`;
   const body = $('.explore-body', view);
   if (sub === 'month') renderMonth(body);
+  if (sub === 'news') renderNews(body);
   if (sub === 'photos') renderGallery(body);
   if (sub === 'timeline') renderTimeline(body);
   if (sub === 'stats') renderStats(body);
