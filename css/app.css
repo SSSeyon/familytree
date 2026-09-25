@@ -524,3 +524,6 @@ html.big .small { font-size: .9rem; }
 .news .news-head h2 { margin: 0; }
 .news-list li .grow { flex: 1; min-width: 0; }
 .news-list a { font-weight: 600; }
+
+/* toggle buttons in the chart toolbar */
+.tool-group .icon-btn[aria-pressed=true] { background: var(--accent-soft); color: var(--accent); }

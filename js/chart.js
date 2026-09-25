@@ -48,11 +48,26 @@ export const chartState = {
   transforms: new Map(),  // root -> d3 zoom transform
 };
 try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; } catch (e) {}
+try { chartState.showRel = localStorage.getItem('ft.relTags') !== '0'; } catch (e) { chartState.showRel = true; }
 
 let ctx = null; // live render context
 const meAsked = () => { try { return localStorage.getItem('ft.meAsked') === '1'; } catch (e) { return false; } };
 // Redraw in place (e.g. after "I am…" changes), keeping the zoom.
 export function redrawChart() { if (ctx?.wrap.isConnected) { $('.me-ask', ctx.wrap)?.remove(); draw(); } }
+
+// "Who are you?" box on the tree (new visitors, or the relationships toggle with nobody picked).
+function showMeAsk(wrap) {
+  if ($('.me-ask', wrap)) return $('.me-ask [data-me]', wrap).focus();
+  const box = html(`<div class="me-ask card-box">
+    <div class="row"><strong>${t('whoAreYou')}</strong><button class="icon-btn" data-act="no-me" aria-label="${t('notNow')}" title="${t('notNow')}">${icon('close')}</button></div>
+    <p class="small muted">${t('meHint')}</p>
+    <div class="picker"><input type="search" data-me placeholder="${esc(t('searchPh'))}" aria-label="${esc(t('chooseYourself'))}"><ul class="search-results" hidden></ul></div>
+  </div>`);
+  $('#legend', wrap).after(box);
+  const inp = $('[data-me]', box);
+  attachSearch(inp, inp.nextElementSibling, p => { box.remove(); setMe(p.id); toast(t('youAre', { name: displayName(p) })); },
+    { searchFn: q => search(q), render: p => `${avatar(p, 'sm')}<span><div>${esc(displayName(p))}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>` });
+}
 
 // branch = a person tapped in the tree: show their forebears up to the top of the line,
 // their siblings (full and half), spouses and descendants. Without it, the whole line from root is drawn.
@@ -87,6 +102,7 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
       <div class="tool-group"><label class="sr-only" for="colour-sel">${t('colourBy')}</label>
         <select id="colour-sel">${['branch', 'gen', 'sex', 'none'].map(c => `<option value="${c}" ${c === chartState.colourBy ? 'selected' : ''}>${t({ branch: 'cBranch', gen: 'cGen', sex: 'cSex', none: 'cNone' }[c])}</option>`).join('')}</select></div>
       <div class="tool-group">
+        <button class="icon-btn" data-act="rel" aria-pressed="${chartState.showRel}" title="${t('showRel')}" aria-label="${t('showRel')}">${icon('tag')}</button>
         <button class="icon-btn" data-act="expand" title="${t('expandAll')}" aria-label="${t('expandAll')}">${icon('expand')}</button>
         <button class="icon-btn" data-act="collapse" title="${t('collapseAll')}" aria-label="${t('collapseAll')}">${icon('collapse')}</button>
         <button class="icon-btn" data-act="png" title="${t('exportPng')}" aria-label="${t('exportPng')}">${icon('download')}</button>
@@ -96,11 +112,6 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
       <defs>${CLIP}</defs>
       <g class="scene"></g></svg>
     <div class="legend" id="legend"></div>
-    ${!getMe() && !meAsked() ? `<div class="me-ask card-box">
-      <div class="row"><strong>${t('whoAreYou')}</strong><button class="icon-btn" data-act="no-me" aria-label="${t('notNow')}" title="${t('notNow')}">${icon('close')}</button></div>
-      <p class="small muted">${t('meHint')}</p>
-      <div class="picker"><input type="search" data-me placeholder="${esc(t('searchPh'))}" aria-label="${esc(t('chooseYourself'))}"><ul class="search-results" hidden></ul></div>
-    </div>` : ''}
     <div class="zoom-ctl tool-group">
       <button class="icon-btn" data-act="in" aria-label="${t('zoomIn')}" title="${t('zoomIn')}">${icon('plus')}</button>
       <button class="icon-btn" data-act="out" aria-label="${t('zoomOut')}" title="${t('zoomOut')}">${icon('minus')}</button>
@@ -127,8 +138,7 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
   else if (saved) svg.call(zoom.transform, saved);
   else initialView();
 
-  const meInput = $('[data-me]', wrap);
-  if (meInput) attachSearch(meInput, meInput.nextElementSibling, p => { $('.me-ask', wrap)?.remove(); setMe(p.id); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: p => `${avatar(p, 'sm')}<span><div>${esc(displayName(p))}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>` });
+  if (!getMe() && !meAsked()) showMeAsk(wrap);
   $('#colour-sel', wrap).onchange =e => { chartState.colourBy = e.target.value; try { localStorage.setItem('ft.colour', e.target.value); } catch (er) {} draw(); };
   wrap.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
@@ -144,6 +154,14 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
     if (act === 'whole') location.hash = `#/chart/${branch}`;
     if (act === 'details') onOpen(branch);
     if (act === 'fan') location.hash = `#/fan/${branch}`;
+    if (act === 'rel') {
+      chartState.showRel = !chartState.showRel;
+      try { localStorage.setItem('ft.relTags', chartState.showRel ? '1' : '0'); } catch (er) {}
+      b.setAttribute('aria-pressed', chartState.showRel);
+      if (chartState.showRel && !getMe()) showMeAsk(wrap);
+      draw();
+      toast(t(chartState.showRel ? 'relOn' : 'relOff'));
+    }
     if (act === 'no-me') { b.closest('.me-ask').remove(); try { localStorage.setItem('ft.meAsked', '1'); } catch (er) {} }
   });
 }
@@ -300,7 +318,7 @@ function draw() {
   // "I am…": label everyone with how they are related to the viewer
   const me = getMe();
   const tagOf = pid => {
-    if (!me) return null;
+    if (!me || !chartState.showRel) return null;
     if (pid === me) return { me: true, text: t('you') };
     const w = relWord(me, pid);
     return w && { text: w[0].toUpperCase() + w.slice(1) };

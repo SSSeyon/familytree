@@ -32,6 +32,7 @@ const STR = {
     // stats
     statsTitle: 'Family at a glance', sPeople: 'people', sNamed: 'named', sFamilies: 'families', sGens: 'generations', sPhotos: 'photos', sLines: 'family lines',
     upcoming: 'Upcoming birthdays', remembrance: 'Remembering', onThisDay: 'On this day', noneSoon: 'None in the next 60 days.',
+    showRel: 'Show how everyone is related to you', relOn: 'Relationships shown', relOff: 'Relationships hidden',
     afButton: 'Add family', afTitle: 'Add to {name}’s family', afIntro: 'Tell us about anyone missing from {name}’s family: a new baby, a husband or wife, a parent, a brother or sister. An editor will check the details and add them to the tree.',
     afPerson: 'Person {n}', afRel: 'Their relationship to {name}', af_child: 'Child', af_spouse: 'Husband or wife', af_parent: 'Parent', af_sibling: 'Brother or sister',
     afOtherParent: 'Other parent', afSomeoneElse: 'Someone else / not in the tree', afOtherName: 'Other parent’s full name (optional)',
@@ -139,6 +140,7 @@ const STR = {
     galTitle: 'Àwòrán ìdílé', galAll: 'Gbogbo ènìyàn', galWithPhoto: 'Tó ní àwòrán', galNoPhoto: 'Tí kò ní àwòrán', addPhoto: 'Fi àwòrán kún un',
     statsTitle: 'Ìdílé ní ṣókí', sPeople: 'ènìyàn', sNamed: 'ní orúkọ', sFamilies: 'ìgbéyàwó', sGens: 'ìran', sPhotos: 'àwòrán', sLines: 'ìran ìdílé',
     upcoming: 'Ọjọ́ ìbí tó ń bọ̀', remembrance: 'Ìrántí', onThisDay: 'Lónìí', noneSoon: 'Kò sí láàrin ọgọ́ta ọjọ́.',
+    showRel: 'Fi bí gbogbo ènìyàn ṣe tan mọ́ ọ hàn', relOn: 'A ń fi ìbátan hàn', relOff: 'A ti fi ìbátan pamọ́',
     afButton: 'Fi ẹbí kún un', afTitle: 'Fi kún ẹbí {name}', afIntro: 'Sọ fún wa nípa ẹnikẹ́ni tí kò sí nínú ẹbí {name}: ọmọ tuntun, ọkọ tàbí aya, òbí, ẹ̀gbọ́n tàbí àbúrò. Olùṣàtúnṣe yóò yẹ̀ ẹ́ wò, yóò sì fi kún igi.',
     afPerson: 'Ènìyàn {n}', afRel: 'Bí ó ṣe tan mọ́ {name}', af_child: 'Ọmọ', af_spouse: 'Ọkọ tàbí aya', af_parent: 'Òbí', af_sibling: 'Ẹ̀gbọ́n tàbí àbúrò',
     afOtherParent: 'Òbí kejì', afSomeoneElse: 'Ẹlòmíràn / kò sí nínú igi', afOtherName: 'Orúkọ òbí kejì (kò pọn dandan)',
