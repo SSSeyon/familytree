@@ -41,6 +41,7 @@ const I = {
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
   cake: '<path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 16c1.5 1 2.5 1 3.5 0s2.5-1 3.5 0 2.5 1 3.5 0 2.5-1 3.5 0M12 12V8M12 5.5c-.8-.8-.8-1.7 0-2.5.8.8.8 1.7 0 2.5Z"/>',
+  fan: '<path d="M2.5 18a9.5 9.5 0 0 1 19 0Z"/><path d="M12 18V8.5M12 18l-6.7-6.7M12 18l6.7-6.7"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/>',
 };
 export const icon = (name, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${I[name] || ''}</svg>`;

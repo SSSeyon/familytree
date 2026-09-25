@@ -2,7 +2,8 @@
 import { store, loadTree, syncRemote, onChange, person, displayName, search, changed } from './data.js';
 import { t, lang } from './i18n.js';
 import { esc, icon, avatar, $, $$, toast, attachSearch } from './ui.js';
-import { renderChart } from './chart.js';
+import { renderChart, redrawChart } from './chart.js';
+import { renderFan } from './fan.js';
 import { renderFocus, renderRelate, renderExplore, searchRow } from './views.js';
 import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPerson } from './person.js';
 import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
@@ -41,6 +42,12 @@ function route() {
       if (!person(r.args[0])) { location.hash = '#/chart'; return; }
       show('chart'); rememberPerson(r.args[0]);
       renderChart(view, { branch: r.args[0], onOpen: openPerson, onRoot, onBranch });
+      break;
+    }
+    case 'fan': {
+      if (!person(r.args[0])) { location.hash = '#/chart'; return; }
+      show('chart'); rememberPerson(r.args[0]);
+      renderFan(view, r.args[0], { onOpen: openPerson, onBranch });
       break;
     }
     case 'focus': show('focus'); renderFocus(view, r.args[0] && person(r.args[0]) ? r.args[0] : lastPerson()); break;
@@ -106,14 +113,15 @@ function wire() {
   attachSearch($('#search'), $('#search-results'), p => {
     rememberPerson(p.id);
     if (current.name === 'chart') {
-      const same = location.hash === `#/branch/${p.id}`;
-      location.hash = `#/branch/${p.id}`;
+      const to = location.hash.startsWith('#/fan/') ? 'fan' : 'branch';
+      const same = location.hash === `#/${to}/${p.id}`;
+      location.hash = `#/${to}/${p.id}`;
       if (same) route();
     } else location.hash = `#/focus/${p.id}`;
   }, { searchFn: q => search(q), render: searchRow });
   $('#me-btn').onclick = () => { const me = getMe(); location.hash = me ? `#/person/${me}` : '#/settings'; };
   window.addEventListener('hashchange', route);
-  window.addEventListener('ft:me', () => { drawShell(); if (current.name !== 'chart') route(); });
+  window.addEventListener('ft:me', () => { drawShell(); if (current.name !== 'chart') route(); else redrawChart(); });
   window.addEventListener('ft:lang', () => { drawShell(); updateBar(); route(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyTheme(); drawThemeBtn(); });
   $('#theme-btn').onclick = () => { toggleTheme(); drawThemeBtn(); if (current.name === 'settings') route(); };

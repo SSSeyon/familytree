@@ -110,6 +110,7 @@ export function openPerson(pid) {
       <div class="actions">
         <a class="btn" href="#/chart/${esc(pid)}">${icon('tree')}${t('viewInTree')}</a>
         <a class="btn" href="#/focus/${esc(pid)}">${icon('family')}${t('focusHere')}</a>
+        ${parentsOf(pid) ? `<a class="btn" href="#/fan/${esc(pid)}">${icon('fan')}${t('fanChart')}</a>` : ''}
         <a class="btn" href="#/relate/${esc(me && me !== pid ? me : '')}/${esc(pid)}">${icon('link')}${t('relateTo')}</a>
         <button class="btn" data-a="me">${icon('user')}${me === pid ? t('notMe') : t('thisIsMe')}</button>
         <button class="btn primary" data-a="suggest">${icon('chat')}${t('suggest')}</button>

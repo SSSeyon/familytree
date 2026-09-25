@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch, download, nameOf, srcAttr } from './ui.js';
 import { getMe, setMe, closePerson } from './person.js';
 import { searchRow } from './views.js';
+import { renderChecks } from './check.js';
 import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
@@ -441,27 +442,8 @@ export function editPerson(pid) {
 }
 
 // ---------- tools page ----------
-export function findIssues() {
-  const out = [];
-  const nowY = new Date().getFullYear();
-  for (const p of allPeople()) {
-    const add = msg => out.push({ pid: p.id, msg });
-    if (p.birth?.y && p.death?.y && p.death.y < p.birth.y) add(t('issueDeathBeforeBirth'));
-    if ((p.birth?.y || 0) > nowY || (p.death?.y || 0) > nowY) add(t('issueFuture'));
-    if (isNamed(p) && p.sex === 'U') add(t('issueNoSex'));
-    if (!p.parents && !unionsOf(p.id).length) add(t('issueIsolated'));
-    if (p.birth?.y) for (const par of parentIds(p.id)) {
-      const q = person(par);
-      if (q?.birth?.y && p.birth.y < q.birth.y + 12) add(t('issueChildBeforeParent', { name: displayName(q) }));
-      if (q?.birth?.y && p.birth.y > q.birth.y + 75) add(t('issueTooOld', { name: displayName(q) }));
-    }
-  }
-  return out;
-}
-
 export function renderEditorPage(view, rerender) {
   if (!ED.on) { view.innerHTML = `<div class="page"><div class="empty"><p>${t('menuEditor')}</p><button class="btn primary" data-on>${icon('edit')}${t('menuEditor')}</button></div></div>`; $('[data-on]', view).onclick = () => enterEditor(rerender); return; }
-  const issues = findIssues();
   const unnamed = allPeople().filter(p => !isNamed(p));
   const meta = store.tree.meta || (store.tree.meta = {});
   view.innerHTML = `<div class="page"><div class="page-head"><h1>${t('edTools')}</h1></div>
@@ -479,8 +461,7 @@ export function renderEditorPage(view, rerender) {
     </div>
     <section class="card-box" style="margin-top:1rem"><h2>${t('suggestions')}</h2><div data-sugg class="small muted">…</div></section>
     <section class="card-box" style="margin-top:1rem"><h2>${t('needsAttention')}</h2>
-      <h3>${t('issues')} (${issues.length})</h3>
-      <ul class="list-plain">${issues.map(i => `<li>${avatar(person(i.pid), 'sm')}<a href="#/person/${esc(i.pid)}">${nameOf(person(i.pid))}</a><span class="muted small">${esc(i.msg)}</span><span class="right"><button class="btn sm" data-edit="${esc(i.pid)}">${t('edit')}</button></span></li>`).join('') || '<li class="muted">✓</li>'}</ul>
+      <h3>${t('ckTitle')}</h3><div data-checks></div>
       <h3 style="margin-top:1rem">${t('unnamed')} (${unnamed.length})</h3>
       <ul class="list-plain">${unnamed.map(p => `<li>${avatar(p, 'sm')}<span>${esc(contextLine(p.id) || t('unknown'))}</span><span class="right"><button class="btn sm" data-edit="${esc(p.id)}">${t('edit')}</button></span></li>`).join('')}</ul>
     </section></div>`;
@@ -489,6 +470,7 @@ export function renderEditorPage(view, rerender) {
   $$('[data-edit]', view).forEach(b => b.onclick = () => editPerson(b.dataset.edit));
   const fs = $('[data-focus-search]', view);
   attachSearch(fs, fs.nextElementSibling, p => { meta.focusId = p.id; commit(); }, { searchFn: q => search(q), render: searchRow });
+  renderChecks($('[data-checks]', view), { onEdit: editPerson, commit });
   loadSuggestions($('[data-sugg]', view));
 }
 

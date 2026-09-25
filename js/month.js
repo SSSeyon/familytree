@@ -2,6 +2,8 @@
 import { store, allPeople, isLiving, displayName, fmtDate, lifeSpan } from './data.js';
 import { t, lang } from './i18n.js';
 import { esc, icon, avatar, $, toast, nameOf } from './ui.js';
+import { getMe } from './person.js';
+import { relToYou } from './relate.js';
 
 // Shared with sw.js, which shows the reminders when the app is closed (where the browser allows).
 const REM_CACHE = 'ft-reminders', REM_LIST = 'reminders.json', REM_LAST = 'reminders-last.txt';
@@ -40,8 +42,10 @@ export function renderMonth(view) {
   const { bdays, remember } = eventsIn(m);
   const isToday = d => m === thisMonth && d?.d === now.getDate();
   const when = d => m === thisMonth || m === thisMonth % 12 + 1 ? (d?.d ? whenLabel(daysUntil(m, d.d)) : '') : '';
+  const me = getMe();
+  const relOf = p => (me && me !== p.id && relToYou(me, p.id)) || '';
   const row = (p, d, kind) => `<li class="${isToday(d) ? 'today' : ''}">${avatar(p, 'sm')}
-    <span class="grow"><a href="#/person/${esc(p.id)}">${nameOf(p)}</a><div class="small muted">${esc(d.d ? fmtDate({ d: d.d, m }) : t('dayUnknown'))}${when(d) ? ' · ' + esc(when(d)) : ''}${kind === 'r' && lifeSpan(p) ? ' · ' + esc(lifeSpan(p)) : ''}</div></span>
+    <span class="grow"><a href="#/person/${esc(p.id)}">${nameOf(p)}</a>${relOf(p) ? ` <span class="rel-inline small">${esc(relOf(p))}</span>` : ''}<div class="small muted">${esc(d.d ? fmtDate({ d: d.d, m }) : t('dayUnknown'))}${when(d) ? ' · ' + esc(when(d)) : ''}${kind === 'r' && lifeSpan(p) ? ' · ' + esc(lifeSpan(p)) : ''}</div></span>
     <a class="btn sm" target="_blank" rel="noopener" href="${esc(waHref(kind === 'b' ? bdayText(p) : rememberText(p)))}">${icon('whatsapp')}${t(kind === 'b' ? 'sendWishes' : 'shareMemory')}</a></li>`;
   const summary = [
     t('monthShare', { month: monthName(m), family: family() }),

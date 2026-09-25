@@ -7,7 +7,10 @@ import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, attachSearch, nameOf, srcAttr } from './ui.js';
 import { renderMonth } from './month.js';
 
-const searchRow = p => `${avatar(p, 'sm')}<span><div>${nameOf(p)}${p.nickname ? ` <span class="muted small">“${esc(p.nickname)}”</span>` : ''}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>`;
+const searchRow = p => {
+  const me = getMe(), rel = me && me !== p.id ? relToYou(me, p.id) : null;
+  return `${avatar(p, 'sm')}<span><div>${nameOf(p)}${p.nickname ? ` <span class="muted small">“${esc(p.nickname)}”</span>` : ''}</div><div class="small muted">${rel ? `<span class="rel-inline">${esc(rel)}</span> · ` : ''}${esc(contextLine(p.id))}</div></span>`;
+};
 
 // ---------- person mini card ----------
 function pcard(pid, cls = '', { href, showRel = true } = {}) {

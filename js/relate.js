@@ -135,7 +135,7 @@ function enRel(rel, sexB, spouseName) {
     case 'childInLaw': return (rel.gen > 1 ? greats(rel.gen - 2) + 'grand' : '') + g(sexB, 'son', 'daughter', 'child') + '-in-law';
     case 'siblingInLaw': return g(sexB, 'brother', 'sister', 'sibling') + '-in-law';
     case 'viaSpouse': return `${spouseName}’s ${enBlood(rel.inner, sexB)}`;
-    case 'spouseOfRel': return `${g(sexB, 'husband', 'wife', 'spouse')} of a ${enBlood(rel.inner, store.P[rel.spouse]?.sex)}`;
+    case 'spouseOfRel': { const w = enBlood(rel.inner, store.P[rel.spouse]?.sex); return `${g(sexB, 'husband', 'wife', 'spouse')} of ${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`; }
     case 'distant': return 'relative by marriage';
   }
   return null;

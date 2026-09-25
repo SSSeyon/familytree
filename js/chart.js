@@ -1,8 +1,10 @@
 // Full descendant chart with pan/zoom, collapsible branches and branch colours.
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm';
-import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initials, mainFounder, founderFor, descendants, parentsOf, spousesOf } from './data.js';
+import { store, person, unionsOf, kidsOf, spouseIn, displayName, lifeSpan, initials, mainFounder, founderFor, descendants, parentsOf, spousesOf, search, contextLine } from './data.js';
 import { t } from './i18n.js';
-import { esc, icon, html, $, download, toast, srcAttr } from './ui.js';
+import { esc, icon, html, $, download, toast, srcAttr, attachSearch, avatar } from './ui.js';
+import { getMe, setMe } from './person.js';
+import { relWord } from './relate.js';
 
 const W = 146, H = 60, SG = 22, HG = 18, VG = 62;
 const CLIP = '<clipPath id="ph-clip" clipPathUnits="userSpaceOnUse"><circle cx="28" cy="30" r="19"/></clipPath>';
@@ -31,10 +33,13 @@ const CHART_CSS = `
 .badge{cursor:pointer}
 .badge rect{fill:var(--surface-2);stroke:var(--line-strong)}
 .badge text{font:600 10px Inter,system-ui,sans-serif;fill:var(--text-2)}
+.rtag rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+.rtag text{font:600 9.5px Inter,system-ui,sans-serif;fill:var(--text)}
+.rtag.me rect{fill:var(--accent)}.rtag.me text{fill:var(--accent-ink)}
 @keyframes ftpulse{0%,100%{stroke-width:3}50%{stroke-width:7}}
 .node.pulse .card{animation:ftpulse .7s ease-in-out 3}
 `;
-const VARS = ['--surface', '--surface-2', '--surface-3', '--line-strong', '--text', '--text-2', '--text-3', '--accent', '--bg', ...PALETTE, '--b-other', ...GENS];
+const VARS = ['--surface', '--surface-2', '--surface-3', '--line-strong', '--text', '--text-2', '--text-3', '--accent', '--accent-soft', '--accent-ink', '--bg', ...PALETTE, '--b-other', ...GENS];
 
 export const chartState = {
   root: null,
@@ -45,6 +50,9 @@ export const chartState = {
 try { chartState.colourBy = localStorage.getItem('ft.colour') || 'branch'; } catch (e) {}
 
 let ctx = null; // live render context
+const meAsked = () => { try { return localStorage.getItem('ft.meAsked') === '1'; } catch (e) { return false; } };
+// Redraw in place (e.g. after "I am…" changes), keeping the zoom.
+export function redrawChart() { if (ctx?.wrap.isConnected) { $('.me-ask', ctx.wrap)?.remove(); draw(); } }
 
 // branch = a person tapped in the tree: show their forebears up to the top of the line,
 // their siblings (full and half), spouses and descendants. Without it, the whole line from root is drawn.
@@ -74,7 +82,7 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
   const wrap = html(`<div class="chart-wrap">
     <div class="chart-toolbar">
       ${mode
-        ? `<div class="tool-group"><button class="btn sm" data-act="whole">${icon('tree')}${t('wholeTree')}</button><button class="btn sm" data-act="details">${icon('info')}${t('details')}</button></div>`
+        ? `<div class="tool-group"><button class="btn sm" data-act="whole">${icon('tree')}${t('wholeTree')}</button><button class="btn sm" data-act="details">${icon('info')}${t('details')}</button><button class="btn sm" data-act="fan">${icon('fan')}${t('fanChart')}</button></div>`
         : root !== mainFounder() ? `<div class="tool-group"><button class="btn sm" data-act="home">${icon('tree')}${esc(t('lineOf', { name: displayName(P[mainFounder()]) }))}</button></div>` : ''}
       <div class="tool-group"><label class="sr-only" for="colour-sel">${t('colourBy')}</label>
         <select id="colour-sel">${['branch', 'gen', 'sex', 'none'].map(c => `<option value="${c}" ${c === chartState.colourBy ? 'selected' : ''}>${t({ branch: 'cBranch', gen: 'cGen', sex: 'cSex', none: 'cNone' }[c])}</option>`).join('')}</select></div>
@@ -88,6 +96,11 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
       <defs>${CLIP}</defs>
       <g class="scene"></g></svg>
     <div class="legend" id="legend"></div>
+    ${!getMe() && !meAsked() ? `<div class="me-ask card-box">
+      <div class="row"><strong>${t('whoAreYou')}</strong><button class="icon-btn" data-act="no-me" aria-label="${t('notNow')}" title="${t('notNow')}">${icon('close')}</button></div>
+      <p class="small muted">${t('meHint')}</p>
+      <div class="picker"><input type="search" data-me placeholder="${esc(t('searchPh'))}" aria-label="${esc(t('chooseYourself'))}"><ul class="search-results" hidden></ul></div>
+    </div>` : ''}
     <div class="zoom-ctl tool-group">
       <button class="icon-btn" data-act="in" aria-label="${t('zoomIn')}" title="${t('zoomIn')}">${icon('plus')}</button>
       <button class="icon-btn" data-act="out" aria-label="${t('zoomOut')}" title="${t('zoomOut')}">${icon('minus')}</button>
@@ -114,7 +127,9 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
   else if (saved) svg.call(zoom.transform, saved);
   else initialView();
 
-  $('#colour-sel', wrap).onchange = e => { chartState.colourBy = e.target.value; try { localStorage.setItem('ft.colour', e.target.value); } catch (er) {} draw(); };
+  const meInput = $('[data-me]', wrap);
+  if (meInput) attachSearch(meInput, meInput.nextElementSibling, p => { $('.me-ask', wrap)?.remove(); setMe(p.id); toast(t('youAre', { name: displayName(p) })); }, { searchFn: q => search(q), render: p => `${avatar(p, 'sm')}<span><div>${esc(displayName(p))}</div><div class="small muted">${esc(contextLine(p.id))}</div></span>` });
+  $('#colour-sel', wrap).onchange =e => { chartState.colourBy = e.target.value; try { localStorage.setItem('ft.colour', e.target.value); } catch (er) {} draw(); };
   wrap.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
@@ -128,6 +143,8 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
     if (act === 'home') onRoot(mainFounder());
     if (act === 'whole') location.hash = `#/chart/${branch}`;
     if (act === 'details') onOpen(branch);
+    if (act === 'fan') location.hash = `#/fan/${branch}`;
+    if (act === 'no-me') { b.closest('.me-ask').remove(); try { localStorage.setItem('ft.meAsked', '1'); } catch (er) {} }
   });
 }
 
@@ -280,6 +297,14 @@ function draw() {
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0);
   drawLegend(maxDepth);
   const hl = ctx.highlight;
+  // "I am…": label everyone with how they are related to the viewer
+  const me = getMe();
+  const tagOf = pid => {
+    if (!me) return null;
+    if (pid === me) return { me: true, text: t('you') };
+    const w = relWord(me, pid);
+    return w && { text: w[0].toUpperCase() + w.slice(1) };
+  };
 
   let links = '', cards = '';
   const hasParents = pid => !!person(pid)?.parents;
@@ -302,8 +327,8 @@ function draw() {
       const xs = g.kids.map(k => k.px + W / 2);
       links += `<path class="link"${col(g.si)} d="M${ox},${oy}V${busY}M${Math.min(ox, ...xs)},${busY}H${Math.max(ox, ...xs)}${xs.map(x => `M${x},${busY}V${n.py + H + VG}`).join('')}"/>`;
     });
-    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, toggle: n.hasKids && !n.lock ? (n.collapsed ? '+' + n.kidCount : '−') : null });
-    n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, badge: !ctx.mode && hasParents(s.pid) && !descendants(root).has(s.pid) }); });
+    cards += card(n.pid, n.px, n.py, { depth: n.depth, dup: n.dup, bi, hl, tag: tagOf(n.pid), toggle: n.hasKids && !n.lock ? (n.collapsed ? '+' + n.kidCount : '−') : null });
+    n.spouses.forEach(s => { cards += card(s.pid, s.x, s.y, { depth: n.depth, spouse: true, bi, hl, tag: tagOf(s.pid), badge: !ctx.mode && hasParents(s.pid) && !descendants(root).has(s.pid) }); });
   }
   scene.html(`<g class="links">${links}</g><g class="cards">${cards}</g>`);
 
@@ -323,7 +348,7 @@ function draw() {
   });
 }
 
-function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
+function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge, tag }) {
   const p = person(pid) || {};
   const name = displayName(p);
   const cut = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
@@ -332,6 +357,11 @@ function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
   const sub = cut([p.nickname ? `“${p.nickname}”` : '', lifeSpan(p)].filter(Boolean).join(' · '), 17);
   const ys = rows.length === 2 ? (sub ? [20, 34, 48] : [27, 41]) : (sub ? [27, 42] : [34]);
   const col = colourFor(pid, depth, spouse, bi);
+  let tagSvg = '';
+  if (tag) { // pill on the top edge, clear of the "↑" badge
+    const maxW = badge ? W - 46 : W - 20, s = cut(tag.text, Math.floor((maxW - 12) / 5.5)), tw = Math.min(maxW, s.length * 5.5 + 12);
+    tagSvg = `<g class="rtag${tag.me ? ' me' : ''}" transform="translate(10,-8)"><rect width="${tw}" height="15" rx="7.5"/><text x="${tw / 2}" y="10.8" text-anchor="middle">${esc(s)}</text></g>`;
+  }
   const photo = p.photo
     ? `<circle class="phbg" cx="28" cy="30" r="19"/><image ${srcAttr(p.photo, 'href')} x="9" y="11" width="38" height="38" clip-path="url(#ph-clip)" preserveAspectRatio="xMidYMid slice"/>`
     : `<circle class="phbg" cx="28" cy="30" r="19"/><text class="ini" x="28" y="34.5" text-anchor="middle">${esc(initials(p))}</text>`;
@@ -343,6 +373,7 @@ function card(pid, x, y, { depth, dup, spouse, bi, hl, toggle, badge }) {
     ${rows.map((r, i) => `<text class="nm" x="54" y="${ys[i]}">${esc(r)}</text>`).join('')}
     ${sub ? `<text class="sub" x="54" y="${ys[rows.length]}">${esc(sub)}</text>` : ''}
     ${toggle ? `<g class="tog" transform="translate(${W / 2},${H})"><circle r="${toggle.length > 1 ? 13 : 10}"/><text y="4" text-anchor="middle">${toggle}</text></g>` : ''}
+    ${tagSvg}
     ${badge ? `<g class="badge" transform="translate(${W - 34},-9)"><title>${esc(t('showFamily'))}</title><rect width="28" height="18" rx="9"/><text x="14" y="13" text-anchor="middle">↑</text></g>` : ''}
   </g>`;
 }

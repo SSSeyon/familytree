@@ -3,7 +3,8 @@
 An interactive family tree website, converted from a Quick Family Tree (`.ftz`) export. It is plain HTML, CSS and JavaScript with no build step, and is hosted free on GitHub Pages.
 
 **What viewers get:**
-- A zoomable tree chart and a family view centred on one person.
+- A zoomable tree chart, a fan chart of forebears, and a family view centred on one person.
+- "I am…": pick yourself once and every card, search result and birthday shows how that person is related to you.
 - Person cards with photos, stories, oríkì and voice notes.
 - A "How are we related?" finder that draws the connection as a small family tree.
 - "This month": birthdays and remembrance days, with one-tap WhatsApp greetings and optional phone reminders.
@@ -12,14 +13,14 @@ An interactive family tree website, converted from a Quick Family Tree (`.ftz`) 
 - Share links; PNG, print and GEDCOM export.
 - A "Suggest a change" button that sends to the editors or to WhatsApp.
 
-**What you (the editor) get:** a built-in editor unlocked with a family passphrase. It syncs through Firebase (free plan). The site also installs as a phone app (PWA).
+**What you (the editor) get:** a built-in editor unlocked with a family passphrase. Editor tools include a tree checker that flags likely mistakes (a child born before a parent, dates after death, possible duplicates). It syncs through Firebase (free plan). The site also installs as a phone app (PWA).
 
 ## Project layout
 
 | Path | What it is |
 |---|---|
 | `index.html`, `css/`, `js/` | The app |
-| `version.js` | App version shown in Settings (`V1.6`). **Bump it on every update**; this also refreshes everyone's offline copy. |
+| `version.js` | App version shown in Settings (`V1.7`). **Bump it on every update**; this also refreshes everyone's offline copy. |
 | `config.js` | Settings: Firebase details, WhatsApp number, start person, privacy |
 | `backend/firestore.rules` | Security rules to paste into Firebase |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable app (PWA) and offline support |
