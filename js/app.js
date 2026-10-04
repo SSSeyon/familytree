@@ -93,10 +93,10 @@ function drawShell() {
   if (current.name) show(current.name);
 }
 
-// Sun in dark mode, moon in light mode: tap to switch.
+// Same switch as Spendwise: the emoji shows the current mode (moon = dark, sun = light); tap to switch.
 function drawThemeBtn() {
   const b = $('#theme-btn');
-  b.innerHTML = icon(isDark() ? 'sun' : 'moon');
+  b.innerHTML = `<span class="theme-btn-icon">${isDark() ? '🌙' : '☀️'}</span>`;
   b.title = t(isDark() ? 'themeLight' : 'themeDark');
   b.setAttribute('aria-label', b.title);
 }
