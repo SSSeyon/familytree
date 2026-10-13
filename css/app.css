@@ -561,3 +561,15 @@ html.big .small { font-size: .9rem; }
   .chart-toolbar .btn .lbl { display: none; }
   .chart-toolbar .btn.sm { padding: .3em .5em; }
 }
+
+/* ---------- Photo cropper ---------- */
+.crop { display: grid; gap: .8rem; }
+.crop-stage { display: grid; place-items: center; background: #111; border-radius: 12px; padding: .6rem; overflow: hidden; }
+.crop-frame { position: relative; overflow: hidden; touch-action: none; cursor: grab; user-select: none; box-shadow: 0 0 0 2px rgb(255 255 255 / .9); }
+.crop-frame:active { cursor: grabbing; }
+.crop-frame .crop-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; max-width: none; }
+/* round guide for profile photos: darken the corners */
+.crop-frame.round::after { content: ''; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / .45); pointer-events: none; }
+.crop-tools { display: flex; align-items: center; gap: .6rem; }
+.crop-tools input[type=range] { flex: 1; accent-color: var(--accent); }
+.crop-aspects { justify-self: center; }

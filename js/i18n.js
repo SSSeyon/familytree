@@ -32,6 +32,7 @@ const STR = {
     // stats
     statsTitle: 'Family at a glance', sPeople: 'people', sNamed: 'named', sFamilies: 'families', sGens: 'generations', sPhotos: 'photos', sLines: 'family lines',
     upcoming: 'Upcoming birthdays', remembrance: 'Remembering', onThisDay: 'On this day', noneSoon: 'None in the next 60 days.',
+    cropTitle: 'Crop', cropOriginal: 'Original', cropRotate: 'Rotate', cropUse: 'Use photo', cropHelp: 'Drag to move. Pinch, scroll or use the slider to zoom.',
     afIntroEd: 'Add {name}’s relatives. They go straight into the tree; publish when you’re ready.', afTitleEd: 'Add relatives of {name}', afButtonEd: 'Add relatives',
     afAddedNow: 'Added {n} to the tree. Publish when you’re ready.', done: 'Done', discardEdits: 'Discard the changes you made to this person?', discard: 'Discard',
     edMore: 'Story, oríkì & more',
@@ -143,6 +144,7 @@ const STR = {
     galTitle: 'Àwòrán ìdílé', galAll: 'Gbogbo ènìyàn', galWithPhoto: 'Tó ní àwòrán', galNoPhoto: 'Tí kò ní àwòrán', addPhoto: 'Fi àwòrán kún un',
     statsTitle: 'Ìdílé ní ṣókí', sPeople: 'ènìyàn', sNamed: 'ní orúkọ', sFamilies: 'ìgbéyàwó', sGens: 'ìran', sPhotos: 'àwòrán', sLines: 'ìran ìdílé',
     upcoming: 'Ọjọ́ ìbí tó ń bọ̀', remembrance: 'Ìrántí', onThisDay: 'Lónìí', noneSoon: 'Kò sí láàrin ọgọ́ta ọjọ́.',
+    cropTitle: 'Gé àwòrán', cropOriginal: 'Bí ó ṣe wà', cropRotate: 'Yí i padà', cropUse: 'Lo àwòrán yìí', cropHelp: 'Fà á láti gbé e. Fún un pọ̀ tàbí lo ìfàsẹ́yìn láti sún mọ́.',
     afIntroEd: 'Fi àwọn ẹbí {name} kún un. Wọn yóò wọ inú igi lẹ́sẹ̀kẹsẹ̀; tẹ Fipamọ́ nígbà tí o bá ṣetán.', afTitleEd: 'Fi ẹbí {name} kún un', afButtonEd: 'Fi ẹbí kún un',
     afAddedNow: 'A ti fi {n} kún igi.', done: 'Ó parí', discardEdits: 'Ṣé kí a pa àwọn àtúnṣe rẹ tì?', discard: 'Pa á tì',
     edMore: 'Ìtàn, oríkì àti àwọn míràn',

@@ -5,9 +5,10 @@ import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch,
 import { getMe, setMe, closePerson, openPerson } from './person.js';
 import { searchRow } from './views.js';
 import { renderChecks } from './check.js';
+import { cropImage } from './crop.js';
 import { describeAddition, openAddFamily } from './family.js';
 import { recordNews } from './news.js';
-import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
+import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, resolveMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
 
 const CFG = window.FT_CONFIG || {};
 const ED = { on: false, dirty: 0, baseRev: 0, uploads: new Map() };
@@ -228,22 +229,10 @@ function removeMarriage(uid) {
 }
 
 // ---------- images ----------
-async function fileToSquareJpeg(file, size = 360) {
-  const img = await createImageBitmap(file);
-  const s = Math.min(img.width, img.height);
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-  return c.toDataURL('image/jpeg', 0.85);
-}
-async function fileToScaledJpeg(file, max = 1400) {
-  const img = await createImageBitmap(file);
-  const k = Math.min(1, max / Math.max(img.width, img.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.85);
-}
+// Profile photos: square, cropped by the editor (see crop.js).
+const cropPhoto = blob => cropImage(blob, { aspect: 1, round: true, size: 480 });
+// The current photo as a Blob, wherever it is stored (data URL, uploaded "fs:" file or photos/…).
+const photoBlob = async src => (await fetch(src.startsWith('fs:') ? await resolveMedia(src) : src)).blob();
 const blobToDataUrl = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
 
 // ---------- person form ----------
@@ -277,7 +266,7 @@ export function editPerson(pid, { fresh = false } = {}) {
       <div data-photo>${avatar({ ...p, photo }, 'lg')}</div>
       <div class="ed-photo-btns">
         <label class="btn sm">${icon('photo')}${t(photo ? 'changePhoto' : 'addPhoto')}<input type="file" accept="image/*" data-photo-in hidden></label>
-        ${photo ? `<button type="button" class="btn sm ghost" data-photo-rm>${t('removePhoto')}</button>` : ''}
+        ${photo ? `<button type="button" class="btn sm" data-photo-crop>${icon('crop')}${t('cropTitle')}</button><button type="button" class="btn sm ghost" data-photo-rm>${t('removePhoto')}</button>` : ''}
       </div>
     </div>
     <div class="grid-2">
@@ -395,19 +384,27 @@ export function editPerson(pid, { fresh = false } = {}) {
     if (!(await confirmBox(t('confirmDelete', { name: displayName(p) }), t('delete')))) return;
     deletePerson(pid); finish(); commit();
   });
-  $('[data-photo-in]', body).onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    photo = await fileToSquareJpeg(f);
+  const setPhoto = dataUrl => {
+    if (!dataUrl) return;
+    photo = dataUrl;
     ED.uploads.set(`photos/${pid}.jpg`, { dataUrl: photo });
     $('[data-photo]', body).innerHTML = avatar({ ...p, photo }, 'lg');
     dirty = true;
   };
+  $('[data-photo-in]', body).onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    setPhoto(await cropPhoto(f));
+  };
+  $('[data-photo-crop]', body)?.addEventListener('click', async () => {
+    try { setPhoto(await cropPhoto(await photoBlob(photo))); } catch (err) { toast(t('genericError', { msg: err.message })); }
+  });
   $('[data-photo-rm]', body)?.addEventListener('click', () => { photo = ''; dirty = true; $('[data-photo]', body).innerHTML = avatar({ ...p, photo: '' }, 'lg'); });
   $('[data-media-in]', body).onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     const isImg = f.type.startsWith('image/');
     if (!isImg && f.size > 20e6) { toast('File too large (max 20 MB).'); return; }
-    const dataUrl = isImg ? await fileToScaledJpeg(f) : await blobToDataUrl(f);
+    const dataUrl = isImg ? await cropImage(f, { max: 1400 }) : await blobToDataUrl(f);
+    if (!dataUrl) return;
     const ext = isImg ? 'jpg' : (f.name.split('.').pop() || 'mp3').toLowerCase();
     ED.uploads.set(`media/${pid}-${Date.now().toString(36)}.${ext}`, { dataUrl });
     media.push({ type: isImg ? 'image' : 'audio', src: dataUrl, caption: f.name.replace(/\.[^.]+$/, '') });
