@@ -408,17 +408,16 @@ legend { font-weight: 600; font-size: .85rem; padding: 0 .3rem; }
 .topbar .tabs a:hover { background: var(--bar-soft); color: var(--bar-ink); opacity: 1; }
 .topbar .tabs a[aria-current=page] { background: var(--bar-soft); color: var(--bar-ink); opacity: 1; box-shadow: inset 0 -2px 0 var(--gold); }
 .theme-btn {
-  margin-left: auto; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
-  border: 1px solid rgb(255 255 255 / .35); background: transparent; color: var(--bar-ink); cursor: pointer; padding: 0;
+  margin-left: auto; flex: none; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--bar-ink); cursor: pointer; padding: 6px;
+  border-radius: 8px; font-size: 1.1rem; line-height: 1; transition: background .18s;
 }
 .theme-btn:hover { background: var(--bar-soft); }
-.theme-btn svg { width: 19px; height: 19px; }
 .topbar .me-btn { margin-left: 0; background: transparent; border-color: rgb(255 255 255 / .35); color: var(--bar-ink); }
 .topbar .me-btn:hover { background: var(--bar-soft); }
 .topbar .me-btn.on { border-color: var(--gold); background: var(--bar-soft); }
 .topbar .me-btn svg { color: var(--bar-ink); }
 @media (max-width: 760px) {
-  .theme-btn { width: 34px; height: 34px; }
   .topbar .me-btn { background: transparent; }
   .topbar .me-btn.on { background: transparent; border-color: var(--gold); }
 }
