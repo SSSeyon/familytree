@@ -7,7 +7,8 @@ import { renderFan } from './fan.js';
 import { hasUnseenNews } from './news.js';
 import { renderFocus, renderRelate, renderExplore, searchRow } from './views.js';
 import { openPerson, closePerson, setPersonHooks, getMe, lastPerson, rememberPerson } from './person.js';
-import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar } from './editor.js';
+import { isEditing, enterEditor, editPerson, renderEditorPage, wantsEditor, updateBar, addRelatives } from './editor.js';
+import { setFamilyHooks } from './family.js';
 import { renderSettings, applyTheme, applyTextSize, isDark, toggleTheme } from './settings.js';
 import { resolveMedia } from './backend.js';
 import { scheduleReminders } from './month.js';
@@ -130,6 +131,7 @@ function wire() {
   new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(n => n.nodeType === 1 && hydrateMedia(n.parentNode || n)))).observe(document.body, { childList: true, subtree: true });
   onChange(() => { drawShell(); route(); });
   setPersonHooks({ isEditing, edit: editPerson });
+  setFamilyHooks({ isEditing, apply: addRelatives, open: openPerson });
 }
 
 async function sync() {

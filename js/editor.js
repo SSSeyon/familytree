@@ -2,10 +2,10 @@
 import { store, person, union, parentsOf, unionsOf, spouseIn, kidsOf, displayName, isLiving, newId, changed, setTree, search, contextLine, allPeople, isNamed, childrenOf, parentIds, cacheTree } from './data.js';
 import { t } from './i18n.js';
 import { esc, icon, avatar, html, $, $$, toast, modal, confirmBox, attachSearch, download, nameOf, srcAttr } from './ui.js';
-import { getMe, setMe, closePerson } from './person.js';
+import { getMe, setMe, closePerson, openPerson } from './person.js';
 import { searchRow } from './views.js';
 import { renderChecks } from './check.js';
-import { describeAddition } from './family.js';
+import { describeAddition, openAddFamily } from './family.js';
 import { recordNews } from './news.js';
 import { hasBackend, fetchRemoteTree, saveTree, uploadMedia, signIn, signOut, isSignedIn, checkSignIn, listSuggestions, deleteSuggestion } from './backend.js';
 
@@ -89,7 +89,7 @@ export function updateBar() {
     if (a === 'save') saveAll();
     if (a === 'discard' && await confirmBox(t('edDiscard') + '?', t('edDiscard'))) { clearDraft(); ED.dirty = 0; ED.uploads.clear(); location.reload(); }
     if (a === 'hide') hideEditor();
-    if (a === 'new') { const id = createPerson({}); commit(); editPerson(id); }
+    if (a === 'new') editPerson(createPerson({}), { fresh: true });
   };
 }
 
@@ -259,7 +259,8 @@ function readDate(fd, prefix) {
   return Object.keys(d).length ? d : null;
 }
 
-export function editPerson(pid) {
+// fresh: a person just created for this form; cancelling removes them again.
+export function editPerson(pid, { fresh = false } = {}) {
   const p = person(pid);
   if (!p) return;
   closePerson();
@@ -267,69 +268,94 @@ export function editPerson(pid) {
   const media = [...(p.media || [])];
   let photo = p.photo || '';
   let recorder = null;
+  let dirty = fresh;
+  const hasMore = !!(p.nickname || p.meaning || p.oriki || p.bio || p.notes || p.residence || p.occupation);
+  const sec = (key, title, open, inner) => `<details class="ed-sec" data-sec="${key}" ${open ? 'open' : ''}><summary>${title}</summary><div class="ed-sec-body">${inner}</div></details>`;
 
-  const body = html(`<form style="display:grid;gap:.9rem">
-    <div class="row">
+  const body = html(`<form class="ed-form">
+    <div class="ed-top">
       <div data-photo>${avatar({ ...p, photo }, 'lg')}</div>
-      <div class="row">
-        <label class="btn sm">${icon('photo')}${t('changePhoto')}<input type="file" accept="image/*" data-photo-in hidden></label>
+      <div class="ed-photo-btns">
+        <label class="btn sm">${icon('photo')}${t(photo ? 'changePhoto' : 'addPhoto')}<input type="file" accept="image/*" data-photo-in hidden></label>
         ${photo ? `<button type="button" class="btn sm ghost" data-photo-rm>${t('removePhoto')}</button>` : ''}
       </div>
     </div>
     <div class="grid-2">
-      <label class="field"><span>${t('given')}</span><input type="text" name="given" value="${esc(p.given || '')}"></label>
-      <label class="field"><span>${t('surname')}</span><input type="text" name="surname" value="${esc(p.surname || '')}"></label>
-      <label class="field"><span>${t('nickname')}</span><input type="text" name="nickname" value="${esc(p.nickname || '')}" placeholder="Baba …, Iya …"></label>
-      <div class="field"><span>${t('sex')}</span><div class="seg">${[['M', t('male')], ['F', t('female')], ['U', t('unknownSex')]].map(([v, l]) => `<label><input type="radio" name="sex" value="${v}" ${p.sex === v ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
+      <label class="field"><span>${t('given')}</span><input type="text" name="given" value="${esc(p.given || '')}" autocomplete="off"></label>
+      <label class="field"><span>${t('surname')}</span><input type="text" name="surname" value="${esc(p.surname || '')}" autocomplete="off"></label>
     </div>
-    <label class="field"><span>${t('nameMeaning')}</span><input type="text" name="meaning" value="${esc(p.meaning || '')}" placeholder="${esc(t('nameMeaningPh'))}"></label>
+    <div class="field"><span>${t('sex')}</span><div class="seg">${[['M', t('male')], ['F', t('female')], ['U', t('unknownSex')]].map(([v, l]) => `<label><input type="radio" name="sex" value="${v}" ${p.sex === v ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
     <fieldset><legend>${t('birth')}</legend>${dateInputs('b', p.birth)}
       <input type="text" name="birthPlace" placeholder="${t('birthPlace')}" value="${esc(p.birthPlace || '')}">
       <div class="small muted">${t('livingNote')}</div></fieldset>
     <fieldset><legend>${t('death')}</legend>
       <label class="row small"><input type="checkbox" name="deceased" ${p.deceased || p.death ? 'checked' : ''}> ${t('isDeceased')}</label>
-      ${dateInputs('d', p.death)}
-      <input type="text" name="burialPlace" placeholder="${t('burialPlace')}" value="${esc(p.burialPlace || '')}"></fieldset>
-    <div class="grid-2">
-      <label class="field"><span>${t('residence')}</span><input type="text" name="residence" value="${esc(p.residence || '')}"></label>
-      <label class="field"><span>${t('occupation')}</span><input type="text" name="occupation" value="${esc(p.occupation || '')}"></label>
-    </div>
-    <label class="field"><span>${t('oriki')}</span><textarea name="oriki" rows="3">${esc(p.oriki || '')}</textarea></label>
-    <label class="field"><span>${t('story')}</span><textarea name="bio" rows="4">${esc(p.bio || '')}</textarea></label>
-    <label class="field"><span>${t('notes')}</span><textarea name="notes" rows="2">${esc(p.notes || '')}</textarea></label>
-    ${p.parents ? `<label class="field"><span>${t('order')}</span><input type="number" name="order" min="0" value="${(p.order ?? 0) + 1}"></label>` : ''}
-    <fieldset><legend>${t('media')}</legend><div data-media></div>
-      <div class="row">
-        <label class="btn sm">${icon('plus')}${t('addMedia')}<input type="file" accept="image/*,audio/*" data-media-in hidden></label>
-        <button type="button" class="btn sm" data-rec>${icon('mic')}${t('recordVoice')}</button>
-        <button type="button" class="btn sm" data-link>${icon('link')}${t('addLink')}</button>
-      </div></fieldset>
-    ${unions.length ? `<fieldset><legend>${t('married')}</legend>${unions.map(u => {
-      const sp = spouseIn(u, pid);
-      return `<div style="display:grid;gap:.4rem"><div class="row"><strong>${sp ? nameOf(person(sp)) : t('unknownPartner')}</strong><button type="button" class="btn sm ghost danger" data-unmarry="${esc(u.id)}">${t('removeSpouse')}</button></div>
-        ${dateInputs('m_' + u.id + '_', u.marriage)}<input type="text" name="mp_${esc(u.id)}" placeholder="${t('marriagePlace')}" value="${esc(u.place || '')}">
-        <label class="row small"><input type="checkbox" name="sep_${esc(u.id)}" ${u.separated ? 'checked' : ''}> ${t('separated')}</label></div>`;
-    }).join('<hr style="border:0;border-top:1px solid var(--line)">')}</fieldset>` : ''}
-    <fieldset><legend>${t('relatives')}</legend>
+      <div class="ed-death" ${p.deceased || p.death ? '' : 'hidden'}>${dateInputs('d', p.death)}
+      <input type="text" name="burialPlace" placeholder="${t('burialPlace')}" value="${esc(p.burialPlace || '')}"></div></fieldset>
+
+    ${sec('family', t('relatives'), true, `
       <div class="row">
         ${!parentsOf(pid)?.father ? `<button type="button" class="btn sm" data-add="father">${icon('plus')}${t('addFather')}</button>` : ''}
         ${!parentsOf(pid)?.mother ? `<button type="button" class="btn sm" data-add="mother">${icon('plus')}${t('addMother')}</button>` : ''}
         <button type="button" class="btn sm" data-add="spouse">${icon('plus')}${t('addSpouse')}</button>
         <button type="button" class="btn sm" data-add="child">${icon('plus')}${t('addChild')}</button>
         <button type="button" class="btn sm" data-add="sibling">${icon('plus')}${t('addSibling')}</button>
-        ${p.parents ? `<button type="button" class="btn sm ghost danger" data-unparent>${t('removeFromParents')}</button>` : ''}
       </div>
+      ${unions.filter(u => spouseIn(u, pid)).map(u => {
+        const sp = spouseIn(u, pid);
+        return `<div class="ed-marriage"><div class="row"><strong>⚭ ${nameOf(person(sp))}</strong><button type="button" class="btn sm ghost danger" data-unmarry="${esc(u.id)}">${t('removeSpouse')}</button></div>
+          <div class="small muted">${t('marriageDate')}</div>${dateInputs('m_' + u.id + '_', u.marriage)}
+          <input type="text" name="mp_${esc(u.id)}" placeholder="${t('marriagePlace')}" value="${esc(u.place || '')}">
+          <label class="row small"><input type="checkbox" name="sep_${esc(u.id)}" ${u.separated ? 'checked' : ''}> ${t('separated')}</label></div>`;
+      }).join('')}
       <div class="small muted">${t('linkExisting')}</div>
       <div class="row" style="align-items:stretch">
         <div class="picker" style="flex:1 1 200px"><input type="search" data-link-search placeholder="${esc(t('searchPh'))}"><ul class="search-results" hidden></ul></div>
         <select data-link-role style="width:auto"><option value="spouse">${t('asSpouse')}</option><option value="child">${t('asChild')}</option><option value="parent">${t('asParent')}</option></select>
       </div>
-    </fieldset>
+      ${p.parents ? `<div class="grid-2"><label class="field"><span>${t('order')}</span><input type="number" name="order" min="1" value="${(p.order ?? 0) + 1}"></label></div>` : ''}`)}
+
+    ${sec('more', t('edMore'), hasMore, `
+      <div class="grid-2">
+        <label class="field"><span>${t('nickname')}</span><input type="text" name="nickname" value="${esc(p.nickname || '')}" placeholder="Baba …, Iya …"></label>
+        <label class="field"><span>${t('nameMeaning')}</span><input type="text" name="meaning" value="${esc(p.meaning || '')}" placeholder="${esc(t('nameMeaningPh'))}"></label>
+        <label class="field"><span>${t('residence')}</span><input type="text" name="residence" value="${esc(p.residence || '')}"></label>
+        <label class="field"><span>${t('occupation')}</span><input type="text" name="occupation" value="${esc(p.occupation || '')}"></label>
+      </div>
+      <label class="field"><span>${t('oriki')}</span><textarea name="oriki" rows="3">${esc(p.oriki || '')}</textarea></label>
+      <label class="field"><span>${t('story')}</span><textarea name="bio" rows="4">${esc(p.bio || '')}</textarea></label>
+      <label class="field"><span>${t('notes')}</span><textarea name="notes" rows="2">${esc(p.notes || '')}</textarea></label>`)}
+
+    ${sec('media', `${t('media')}${media.length ? ` (${media.length})` : ''}`, media.length > 0, `<div data-media></div>
+      <div class="row">
+        <label class="btn sm">${icon('plus')}${t('addMedia')}<input type="file" accept="image/*,audio/*" data-media-in hidden></label>
+        <button type="button" class="btn sm" data-rec>${icon('mic')}${t('recordVoice')}</button>
+        <button type="button" class="btn sm" data-link>${icon('link')}${t('addLink')}</button>
+      </div>`)}
+
+    ${fresh ? '' : `<div class="ed-danger row">
+      ${p.parents ? `<button type="button" class="btn sm ghost danger" data-unparent>${t('removeFromParents')}</button>` : ''}
+      <button type="button" class="btn sm ghost danger" data-del>${icon('trash')}${t('deletePerson')}</button></div>`}
   </form>`);
 
-  const foot = html(`<div style="display:contents"><button type="button" class="btn danger" data-del style="margin-right:auto">${icon('trash')}${t('deletePerson')}</button>
-    <button type="button" class="btn" data-close>${t('cancel')}</button><button type="button" class="btn primary" data-apply>${t('save')}</button></div>`);
-  const m = modal({ title: isNamed(p) ? displayName(p) : t('edNewPerson'), body, foot, wide: true });
+  const foot = html(`<div style="display:contents"><button type="button" class="btn" data-close>${t('cancel')}</button><button type="button" class="btn primary" data-apply>${icon('check')}${t('done')}</button></div>`);
+  let closing = false, kept = false;
+  const m = modal({
+    title: isNamed(p) ? displayName(p) : t('edNewPerson'), body, foot, wide: true, sticky: true,
+    // don't lose typing to a stray tap or Escape
+    beforeClose: async () => {
+      if (!dirty || closing) return true;
+      return confirmBox(t('discardEdits'), t('discard'));
+    },
+    onClose: () => { if (fresh && !kept) delete store.P[pid]; },
+  });
+  const finish = () => { closing = true; kept = true; m.close(); };
+  body.addEventListener('input', () => { dirty = true; });
+  body.addEventListener('change', e => {
+    dirty = true;
+    if (e.target.name === 'deceased') $('.ed-death', body).hidden = !e.target.checked;
+  });
+  if (fresh) setTimeout(() => body.given.focus(), 40);
 
   const drawMedia = () => {
     $('[data-media]', body).innerHTML = media.map((x, i) => `<div class="row small" style="margin-bottom:.4rem">
@@ -345,10 +371,10 @@ export function editPerson(pid) {
     const fd = new FormData(body);
     const s = k => (fd.get(k) || '').toString().trim();
     Object.assign(p, { given: s('given'), surname: s('surname'), nickname: s('nickname'), meaning: s('meaning'), sex: fd.get('sex') || 'U', birthPlace: s('birthPlace'), burialPlace: s('burialPlace'), residence: s('residence'), occupation: s('occupation'), oriki: s('oriki'), bio: s('bio'), notes: s('notes') });
-    const b = readDate(fd, 'b'), d = readDate(fd, 'd');
+    const b = readDate(fd, 'b'), d = fd.get('deceased') ? readDate(fd, 'd') : null;
     b ? (p.birth = b) : delete p.birth;
     d ? (p.death = d) : delete p.death;
-    fd.get('deceased') || d ? (p.deceased = true) : delete p.deceased;
+    fd.get('deceased') ? (p.deceased = true) : delete p.deceased;
     if (p.parents && fd.get('order')) p.order = Math.max(0, +fd.get('order') - 1);
     photo ? (p.photo = photo) : delete p.photo;
     p.media = media.filter(x => x.src);
@@ -360,20 +386,23 @@ export function editPerson(pid) {
     }
     for (const k of Object.keys(p)) if (p[k] === '' || (Array.isArray(p[k]) && !p[k].length)) delete p[k];
   };
-  const reopen = id => { m.close(); commit(); editPerson(id); };
+  // keep what was typed, close the form and record the change
+  const save = () => { apply(); finish(); if (dirty || fresh) commit(); };
+  const reopen = id => { save(); editPerson(id); };
 
-  $('[data-apply]', m.el).onclick = () => { apply(); m.close(); commit(); };
-  $('[data-del]', m.el).onclick = async () => {
+  $('[data-apply]', m.el).onclick = () => { save(); openPerson(pid); };
+  $('[data-del]', m.el)?.addEventListener('click', async () => {
     if (!(await confirmBox(t('confirmDelete', { name: displayName(p) }), t('delete')))) return;
-    deletePerson(pid); m.close(); commit(); location.hash = '#/chart';
-  };
+    deletePerson(pid); finish(); commit();
+  });
   $('[data-photo-in]', body).onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     photo = await fileToSquareJpeg(f);
     ED.uploads.set(`photos/${pid}.jpg`, { dataUrl: photo });
     $('[data-photo]', body).innerHTML = avatar({ ...p, photo }, 'lg');
+    dirty = true;
   };
-  $('[data-photo-rm]', body)?.addEventListener('click', () => { photo = ''; $('[data-photo]', body).innerHTML = avatar({ ...p, photo: '' }, 'lg'); });
+  $('[data-photo-rm]', body)?.addEventListener('click', () => { photo = ''; dirty = true; $('[data-photo]', body).innerHTML = avatar({ ...p, photo: '' }, 'lg'); });
   $('[data-media-in]', body).onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     const isImg = f.type.startsWith('image/');
@@ -382,7 +411,7 @@ export function editPerson(pid) {
     const ext = isImg ? 'jpg' : (f.name.split('.').pop() || 'mp3').toLowerCase();
     ED.uploads.set(`media/${pid}-${Date.now().toString(36)}.${ext}`, { dataUrl });
     media.push({ type: isImg ? 'image' : 'audio', src: dataUrl, caption: f.name.replace(/\.[^.]+$/, '') });
-    drawMedia();
+    dirty = true; drawMedia();
   };
   $('[data-rec]', body).onclick = async e => {
     const btn = e.currentTarget;
@@ -399,7 +428,7 @@ export function editPerson(pid) {
         const dataUrl = await blobToDataUrl(blob);
         ED.uploads.set(`media/${pid}-${Date.now().toString(36)}.${ext}`, { dataUrl });
         media.push({ type: 'audio', src: dataUrl, caption: new Date().toLocaleDateString() });
-        recorder = null; btn.innerHTML = `${icon('mic')}${t('recordVoice')}`; drawMedia();
+        dirty = true; recorder = null; btn.innerHTML = `${icon('mic')}${t('recordVoice')}`; drawMedia();
       };
       recorder.start();
       btn.innerHTML = `${icon('mic')}${t('stopRec')}`;
@@ -407,34 +436,23 @@ export function editPerson(pid) {
   };
   $('[data-link]', body).onclick = () => {
     const url = prompt('URL (YouTube, Google Drive, …)');
-    if (url && /^https?:\/\//.test(url)) { media.push({ type: 'link', src: url, caption: '' }); drawMedia(); }
+    if (url && /^https?:\/\//.test(url)) { media.push({ type: 'link', src: url, caption: '' }); dirty = true; drawMedia(); }
   };
   body.addEventListener('click', async e => {
     const rm = e.target.closest('[data-mrm]');
-    if (rm) { media.splice(+rm.dataset.mrm, 1); drawMedia(); return; }
+    if (rm) { media.splice(+rm.dataset.mrm, 1); dirty = true; drawMedia(); return; }
     const un = e.target.closest('[data-unmarry]');
-    if (un) { apply(); removeMarriage(un.dataset.unmarry); reopen(pid); return; }
-    if (e.target.closest('[data-unparent]')) { apply(); delete p.parents; delete p.order; reopen(pid); return; }
+    if (un) { apply(); removeMarriage(un.dataset.unmarry); dirty = true; reopen(pid); return; }
+    if (e.target.closest('[data-unparent]')) { apply(); delete p.parents; delete p.order; dirty = true; reopen(pid); return; }
     const add = e.target.closest('[data-add]')?.dataset.add;
     if (!add) return;
-    apply();
-    if (add === 'father' || add === 'mother') {
-      const nid = createPerson({ sex: add === 'father' ? 'M' : 'F' });
-      if (!setParent(pid, nid)) { delete store.P[nid]; return; }
-      reopen(nid);
-    } else if (add === 'spouse') {
-      const nid = createPerson({ sex: p.sex === 'M' ? 'F' : p.sex === 'F' ? 'M' : 'U' });
-      marry(pid, nid); reopen(nid);
-    } else if (add === 'child') {
-      const uid = await chooseUnion(pid);
-      if (!uid) return;
-      const nid = createPerson({ parents: uid, order: kidsOf(uid).length });
-      reopen(nid);
-    } else if (add === 'sibling') {
-      if (!p.parents) { p.parents = createUnion(); p.order = 0; }
-      const nid = createPerson({ parents: p.parents, order: kidsOf(p.parents).length + 1 });
-      reopen(nid);
-    }
+    // name the new relative first (no blank people), then come back to this form
+    const preset = {
+      father: { rel: 'parent', sex: 'M' }, mother: { rel: 'parent', sex: 'F' }, child: { rel: 'child' }, sibling: { rel: 'sibling' },
+      spouse: { rel: 'spouse', sex: p.sex === 'M' ? 'F' : p.sex === 'F' ? 'M' : '' },
+    }[add];
+    save();
+    openAddFamily(pid, { preset, after: () => editPerson(pid), cancel: () => editPerson(pid) });
   });
   attachSearch($('[data-link-search]', body), $('[data-link-search]', body).nextElementSibling, async other => {
     if (other.id === pid) return;
@@ -482,6 +500,13 @@ export function renderEditorPage(view, rerender) {
 
 // ---------- "Add my family" ----------
 const applied = new Set(); // suggestions added to the tree this session
+
+// Editor mode: "Add family" form → straight into the tree.
+export function addRelatives(add) {
+  const made = applyAddition(add);
+  if (made.length) commit();
+  return made;
+}
 
 // Creates the people described by an "Add my family" form. Returns their new ids.
 function applyAddition(add) {

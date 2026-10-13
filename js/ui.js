@@ -70,7 +70,8 @@ export function toast(msg, ms = 2600) {
 }
 
 // Generic modal. Returns {el, close}. `onClose` runs once.
-export function modal({ title, body, foot = '', wide = false, onClose }) {
+// sticky: a tap outside does not close it (forms). beforeClose(): return false to keep it open.
+export function modal({ title, body, foot = '', wide = false, onClose, sticky = false, beforeClose }) {
   const back = html(`<div class="modal-back" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="modal ${wide ? 'wide' : ''}">
       <div class="modal-head"><h2>${esc(title)}</h2><button class="icon-btn" data-close aria-label="${t('close')}">${icon('close')}</button></div>
@@ -82,8 +83,9 @@ export function modal({ title, body, foot = '', wide = false, onClose }) {
   if (foot) { const f = $('.modal-foot', back); if (typeof foot === 'string') f.innerHTML = foot; else f.append(foot); }
   let closed = false;
   const close = () => { if (closed) return; closed = true; back.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
-  const onKey = e => { if (e.key === 'Escape' && back === [...document.querySelectorAll('.modal-back')].pop()) close(); };
-  back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) close(); });
+  const tryClose = async () => { if (!beforeClose || (await beforeClose()) !== false) close(); };
+  const onKey = e => { if (e.key === 'Escape' && back === [...document.querySelectorAll('.modal-back')].pop()) tryClose(); };
+  back.addEventListener('click', e => { if ((e.target === back && !sticky) || e.target.closest('[data-close]')) tryClose(); });
   document.addEventListener('keydown', onKey);
   document.body.append(back);
   setTimeout(() => $('input,select,textarea,button:not([data-close])', bodyEl)?.focus(), 30);

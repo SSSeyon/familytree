@@ -527,3 +527,38 @@ html.big .small { font-size: .9rem; }
 
 /* toggle buttons in the chart toolbar */
 .tool-group .icon-btn[aria-pressed=true] { background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- Editing: calmer forms ---------- */
+.ed-form { display: grid; gap: .9rem; }
+.ed-top { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.ed-photo-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.ed-form div.field { display: grid; gap: .3em; font-size: .85rem; color: var(--text-2); font-weight: 500; }
+.ed-death { display: grid; gap: .7rem; }
+.ed-sec { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ed-sec > summary { list-style: none; cursor: pointer; padding: .75rem .9rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: .5rem; border-radius: 12px; }
+.ed-sec > summary::-webkit-details-marker { display: none; }
+.ed-sec > summary::after { content: ''; width: 8px; height: 8px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg); transition: transform .15s; margin-right: .2rem; }
+.ed-sec[open] > summary::after { transform: rotate(-135deg); }
+.ed-sec > summary:hover { background: var(--surface-2); }
+.ed-sec-body { display: grid; gap: .8rem; padding: 0 .9rem .9rem; }
+.ed-marriage { display: grid; gap: .45rem; padding: .7rem; border-radius: 10px; background: var(--surface-2); }
+.ed-danger { justify-content: flex-end; border-top: 1px solid var(--line); padding-top: .8rem; }
+.ed-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; margin: -.2rem 0 1rem; }
+.ed-actions .btn { flex: 1 1 auto; justify-content: center; max-width: 220px; }
+/* bigger, easier targets in forms on phones */
+@media (max-width: 760px) {
+  .modal-back { padding: 0; place-items: end stretch; }
+  .modal, .modal.wide { width: 100%; max-height: 92vh; border-radius: 18px 18px 0 0; }
+  .modal-foot { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  .modal-foot .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+  .ed-form input[type=text], .ed-form input[type=number], .ed-form select, .af input, .af select { font-size: 16px; } /* no iOS zoom-in */
+}
+
+/* ---------- Tree toolbar on phones: one row that scrolls sideways ---------- */
+@media (max-width: 760px) {
+  .chart-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; pointer-events: auto; padding-bottom: 4px; }
+  .chart-toolbar::-webkit-scrollbar { display: none; }
+  .chart-toolbar > * { flex: none; }
+  .chart-toolbar .btn .lbl { display: none; }
+  .chart-toolbar .btn.sm { padding: .3em .5em; }
+}

@@ -97,7 +97,7 @@ export function renderChart(view, { root, focusId, branch, onOpen, onRoot, onBra
   const wrap = html(`<div class="chart-wrap">
     <div class="chart-toolbar">
       ${mode
-        ? `<div class="tool-group"><button class="btn sm" data-act="whole">${icon('tree')}${t('wholeTree')}</button><button class="btn sm" data-act="details">${icon('info')}${t('details')}</button><button class="btn sm" data-act="fan">${icon('fan')}${t('fanChart')}</button></div>`
+        ? `<div class="tool-group">${[['whole', 'tree', 'wholeTree'], ['details', 'info', 'details'], ['fan', 'fan', 'fanChart']].map(([a, ic, l]) => `<button class="btn sm" data-act="${a}" title="${t(l)}" aria-label="${t(l)}">${icon(ic)}<span class="lbl">${t(l)}</span></button>`).join('')}</div>`
         : root !== mainFounder() ? `<div class="tool-group"><button class="btn sm" data-act="home">${icon('tree')}${esc(t('lineOf', { name: displayName(P[mainFounder()]) }))}</button></div>` : ''}
       <div class="tool-group"><label class="sr-only" for="colour-sel">${t('colourBy')}</label>
         <select id="colour-sel">${['branch', 'gen', 'sex', 'none'].map(c => `<option value="${c}" ${c === chartState.colourBy ? 'selected' : ''}>${t({ branch: 'cBranch', gen: 'cGen', sex: 'cSex', none: 'cNone' }[c])}</option>`).join('')}</select></div>
@@ -413,13 +413,18 @@ function keepPosition(pid, before) {
 }
 
 function viewport() { const r = ctx.svg.node().getBoundingClientRect(); return { w: r.width, h: r.height }; }
+// Space taken by the toolbar at the top, so the tree starts just below it.
+function topPad() {
+  const bar = $('.chart-toolbar', ctx.wrap), svgTop = ctx.svg.node().getBoundingClientRect().top;
+  return Math.max(56, (bar ? bar.getBoundingClientRect().bottom - svgTop : 40) + 22);
+}
 const extents = () => ({ maxX: Math.max(...ctx.layout.map(n => n.px + n.bw)), maxY: Math.max(...ctx.layout.map(n => n.py + n.bh)) });
 
 function initialView() {
   const pos = nodePos(ctx.root) || { x: 0, y: 0 };
   const { w, h } = viewport();
   const k = 0.85;
-  const tr = d3.zoomIdentity.translate(w / 2 - (pos.x + W / 2) * k, 90).scale(k);
+  const tr = d3.zoomIdentity.translate(w / 2 - (pos.x + W / 2) * k, topPad()).scale(k);
   ctx.svg.call(ctx.zoom.transform, tr);
 }
 
@@ -427,23 +432,24 @@ export function fit() {
   if (!ctx) return;
   const { maxX, maxY } = extents();
   const { w, h } = viewport();
-  const k = Math.max(0.02, Math.min(1.2, (w - 40) / (maxX + 20), (h - 120) / (maxY + 20)));
-  ctx.svg.transition().duration(400).call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 70).scale(k));
+  const k = Math.max(0.02, Math.min(1.2, (w - 40) / (maxX + 20), (h - topPad() - 50) / (maxY + 20)));
+  ctx.svg.transition().duration(400).call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, topPad()).scale(k));
 }
 
 // Show the whole (small) family if it fits at a readable size, else centre on the person.
 function fitOrCenter(pid) {
   const { maxX, maxY } = extents();
   const { w, h } = viewport();
-  let k = Math.min(1, (w - 40) / (maxX + 20), (h - 140) / (maxY + 20));
+  const top = topPad();
+  let k = Math.min(1, (w - 40) / (maxX + 20), (h - top - 60) / (maxY + 20));
   ctx.highlight = pid;
   ctx.scene.selectAll('.node').classed('hl', function () { return this.dataset.pid === pid; });
-  if (k >= 0.45) return ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, 80).scale(k));
+  if (k >= 0.45) return ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate((w - maxX * k) / 2, top).scale(k));
   // too big to read at once: frame the person and the top of their line
   const pos = nodePos(pid), xs = [pid, ...(ctx.mode?.next.keys() || [])].map(nodePos).filter(Boolean).map(p => p.x);
   const x0 = Math.min(...xs), x1 = Math.max(...xs) + W;
-  k = Math.max(0.35, Math.min(0.8, (w - 32) / (x1 - x0), (h - 190) / (pos.y + H)));
-  ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate(w / 2 - (x0 + x1) / 2 * k, 80).scale(k));
+  k = Math.max(0.35, Math.min(0.8, (w - 32) / (x1 - x0), (h - top - 110) / (pos.y + H)));
+  ctx.svg.call(ctx.zoom.transform, d3.zoomIdentity.translate(w / 2 - (x0 + x1) / 2 * k, top).scale(k));
 }
 
 export function centerOn(pid, animate = true) {

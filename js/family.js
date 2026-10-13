@@ -8,6 +8,10 @@ const CFG = window.FT_CONFIG || {};
 const RELS = ['child', 'spouse', 'parent', 'sibling'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Set by app.js: in editor mode the form adds the people straight to the tree.
+let hooks = {};
+export function setFamilyHooks(h) { hooks = h; }
+
 // One line per person, e.g. "Child: Ada Hunga (female), born 3 Aug 2021, with Itunuoluwa Adebo".
 export function describeAddition(add) {
   return (add.people || []).map(e => {
@@ -27,15 +31,15 @@ export function describeAddition(add) {
   }).map(s => `• ${s}`).join('\n');
 }
 
-const row = (pid, n) => {
+const row = (pid, n, preset = {}) => {
   const partners = unionsOf(pid).filter(u => spouseIn(u, pid));
   return `<fieldset class="af-row" data-row="${n}">
     <legend>${t('afPerson', { n: n + 1 })}</legend>
     <div class="grid-2">
       <label class="field"><span>${t('afRel', { name: displayName(person(pid)) })}</span>
-        <select name="rel">${RELS.map(r => `<option value="${r}">${t('af_' + r)}</option>`).join('')}</select></label>
+        <select name="rel">${RELS.map(r => `<option value="${r}" ${preset.rel === r ? 'selected' : ''}>${t('af_' + r)}</option>`).join('')}</select></label>
       <label class="field"><span>${t('sex')}</span>
-        <select name="sex"><option value="">—</option><option value="M">${t('male')}</option><option value="F">${t('female')}</option></select></label>
+        <select name="sex"><option value="">—</option>${[['M', 'male'], ['F', 'female']].map(([v, k]) => `<option value="${v}" ${preset.sex === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></label>
       <label class="field"><span>${t('given')} *</span><input type="text" name="given" autocomplete="off"></label>
       <label class="field"><span>${t('surname')}</span><input type="text" name="surname" autocomplete="off"></label>
     </div>
@@ -53,24 +57,30 @@ const row = (pid, n) => {
   </fieldset>`;
 };
 
-export function openAddFamily(pid) {
+// preset: { rel, sex } to start with. after(newIds): runs once the people are added (editor mode).
+export function openAddFamily(pid, { preset = {}, after, cancel } = {}) {
   const p = person(pid);
   if (!p) return;
+  const editing = !!hooks.isEditing?.();
   let n = 0;
   const body = html(`<form class="af">
-    <p class="small muted">${t('afIntro', { name: displayName(p) })}</p>
-    <div data-rows>${row(pid, n++)}</div>
+    <p class="small muted">${t(editing ? 'afIntroEd' : 'afIntro', { name: displayName(p) })}</p>
+    <div data-rows>${row(pid, n++, preset)}</div>
     <button type="button" class="btn sm" data-more>${icon('plus')}${t('afAnother')}</button>
-    <div class="grid-2">
+    ${editing ? '' : `<div class="grid-2">
       <label class="field"><span>${t('sgName')}</span><input type="text" name="name" autocomplete="name"></label>
       <label class="field"><span>${t('sgContact')}</span><input type="text" name="contact"></label>
-    </div>
+    </div>`}
   </form>`);
-  const foot = html(`<div style="display:contents">
-    <button class="btn" type="button" data-wa>${icon('whatsapp')}${t('sgViaWa')}</button>
-    ${hasBackend() ? `<button class="btn primary" type="button" data-send>${icon('upload')}${t('afSend')}</button>` : ''}
-  </div>`);
-  const m = modal({ title: t('afTitle', { name: displayName(p) }), body, foot, wide: true });
+  const foot = html(editing
+    ? `<div style="display:contents"><button class="btn" type="button" data-close>${t('cancel')}</button>
+       <button class="btn primary" type="button" data-apply>${icon('plus')}${t('afApply')}</button></div>`
+    : `<div style="display:contents">
+       <button class="btn" type="button" data-wa>${icon('whatsapp')}${t('sgViaWa')}</button>
+       ${hasBackend() ? `<button class="btn primary" type="button" data-send>${icon('upload')}${t('afSend')}</button>` : ''}</div>`);
+  let done = false;
+  const m = modal({ title: t(editing ? 'afTitleEd' : 'afTitle', { name: displayName(p) }), body, foot, wide: true, sticky: true, onClose: () => { if (!done) cancel?.(); } });
+  setTimeout(() => $('[name=given]', body)?.focus(), 40);
 
   const wire = fs => {
     const rel = $('[name=rel]', fs), other = $('.af-other', fs), un = $('[name=union]', fs), on = $('[name=otherName]', fs);
@@ -99,13 +109,24 @@ export function openAddFamily(pid) {
       if (e.rel === 'child') { if (v('union')) e.union = v('union'); else if (v('otherName')) e.otherName = v('otherName'); }
       return e;
     }).filter(e => e.given || e.surname);
-    return { add: { v: 1, pid, people }, name: body.name.value.trim(), contact: body.contact.value.trim() };
+    const field = k => $(`[name=${k}]`, body)?.value.trim() || '';
+    return { add: { v: 1, pid, people }, name: field('name'), contact: field('contact') };
   };
   const valid = d => { if (!d.add.people.length) { toast(t('afNeedName')); $('[name=given]', body).focus(); return false; } return true; };
   const about = `${displayName(p)}${contextLine(pid) ? ` (${contextLine(pid)})` : ''}`;
   const link = `${location.origin}${location.pathname}#/person/${pid}`;
 
-  $('[data-wa]', m.el).onclick = () => {
+  const apply = $('[data-apply]', m.el);
+  if (apply) apply.onclick = () => {
+    const d = read(); if (!valid(d)) return;
+    const made = hooks.apply(d.add);
+    if (!made.length) return;
+    done = true; m.close();
+    toast(t('afAddedNow', { n: made.length }), 3500);
+    after ? after(made) : hooks.open?.(pid);
+  };
+  const wa = $('[data-wa]', m.el);
+  if (wa) wa.onclick = () => {
     const d = read(); if (!valid(d)) return;
     const text = `*${t('afTitle', { name: displayName(p) })}*\n${link}\n\n${describeAddition(d.add)}${d.name ? `\n\n— ${d.name}` : ''}${d.contact ? ` (${d.contact})` : ''}`;
     window.open(`https://wa.me/${CFG.whatsapp}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');

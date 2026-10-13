@@ -65,6 +65,7 @@ export function openPerson(pid) {
   const rel = me && me !== pid ? relToYou(me, pid) : null;
   const pp = parentsOf(pid);
   const sib = siblingsOf(pid), sibs = [...sib.full, ...sib.half];
+  const editing = !!hooks.isEditing?.();
   const unions = unionsOf(pid);
   const facts = [
     ['birthPlace', p.birthPlace], ['residence', p.residence], ['occupation', p.occupation], ['burialPlace', p.burialPlace],
@@ -107,6 +108,7 @@ export function openPerson(pid) {
         ${rel ? `<div class="rel-me">${esc(rel)}</div>` : ''}
         ${descLine(pid)}
       </div>
+      ${editing ? `<div class="ed-actions"><button class="btn primary" data-a="edit">${icon('edit')}${t('edit')}</button><button class="btn" data-a="addfam">${icon('plus')}${t('afButtonEd')}</button></div>` : ''}
       ${p.oriki ? `<div class="section-title">${t('oriki')}</div><blockquote class="oriki">${esc(p.oriki)}</blockquote>` : ''}
       ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<dt>${t(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       ${p.bio ? `<div class="section-title">${t('story')}</div><div class="bio">${esc(p.bio)}</div>` : ''}
@@ -122,8 +124,8 @@ export function openPerson(pid) {
         ${parentsOf(pid) ? `<a class="btn" href="#/fan/${esc(pid)}">${icon('fan')}${t('fanChart')}</a>` : ''}
         <a class="btn" href="#/relate/${esc(me && me !== pid ? me : '')}/${esc(pid)}">${icon('link')}${t('relateTo')}</a>
         <button class="btn" data-a="me">${icon('user')}${me === pid ? t('notMe') : t('thisIsMe')}</button>
-        <button class="btn" data-a="addfam">${icon('plus')}${t('afButton')}</button>
-        <button class="btn primary" data-a="suggest">${icon('chat')}${t('suggest')}</button>
+        ${editing ? '' : `<button class="btn" data-a="addfam">${icon('plus')}${t('afButton')}</button>
+        <button class="btn primary" data-a="suggest">${icon('chat')}${t('suggest')}</button>`}
       </div>
     </div></aside>`);
   ov.append(drawer);
